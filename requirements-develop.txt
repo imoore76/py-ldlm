@@ -1,0 +1,10 @@
+-e .[test]
+
+grpcio-tools
+pylint
+yapf
+mypy
+build
+2to3
+twine
+

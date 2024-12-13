@@ -1,0 +1,5 @@
+.*
+!/.gitignore
+!/.github
+/py_ldlm.egg-info
+/dist

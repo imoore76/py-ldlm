@@ -1,0 +1,14 @@
+[tool.pylint.'MESSAGES CONTROL']
+max-line-length = 100
+# Some code is aio and some is not. Cherry picking small portions of logic into
+# a base class would be more confusing than helpful. Code duplication is ok in
+# this case
+disable = ["duplicate-code", "logging-fstring-interpolation"]
+ignore = [".venv", "tests"]
+
+[tool.pylint]
+ignore-patterns = ["ldlm_pb2.*py"]
+
+[tool.mypy]
+exclude = [ "ldlm/protos/.*" ]
+disable_error_code = "import-untyped"

@@ -1,0 +1,50 @@
+name: run_checks
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - run: sudo apt-get install pcre2-utils
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22'
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - run: pip3 install -r requirements-develop.txt
+    - run: go install github.com/google/addlicense@latest
+
+    - run: pip3 install -r requirements-test.txt
+
+    - run: wget https://github.com/go-task/task/releases/download/v3.36.0/task_linux_amd64.deb
+    - run: sudo dpkg -i task_linux_amd64.deb
+    - run: rm task_linux_amd64.deb
+    - run: task check
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    - run: pip3 install -r requirements-test.txt
+    - run: pytest tests
