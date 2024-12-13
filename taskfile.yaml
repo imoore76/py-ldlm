@@ -46,7 +46,6 @@ tasks:
     cmds:
       - task: build
       - python3 -m twine upload dist/*
-    interactive: true
 
   protoc:
     desc: "Build language protobuf files"
