@@ -25,14 +25,13 @@ jobs:
       with:
         python-version: '3.x'
 
-    - run: pip3 install -r requirements-develop.txt
     - run: go install github.com/google/addlicense@latest
-
-    - run: pip3 install -r requirements-test.txt
 
     - run: wget https://github.com/go-task/task/releases/download/v3.36.0/task_linux_amd64.deb
     - run: sudo dpkg -i task_linux_amd64.deb
     - run: rm task_linux_amd64.deb
+
+    - run: pip3 install -r requirements-develop.txt
     - run: task check
 
   test:
