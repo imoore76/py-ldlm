@@ -106,7 +106,6 @@ tasks:
       - '*py'
     cmds:
       - pylint ldlm
-      - pylint setup.py
       - mypy ldlm
 
   fmt:
