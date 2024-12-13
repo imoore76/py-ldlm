@@ -25,6 +25,7 @@ jobs:
       with:
         python-version: '3.x'
 
+    - run: go install github.com/client9/misspell/cmd/misspell@latest
     - run: go install github.com/google/addlicense@latest
 
     - run: wget https://github.com/go-task/task/releases/download/v3.36.0/task_linux_amd64.deb
