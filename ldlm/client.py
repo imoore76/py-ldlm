@@ -35,7 +35,7 @@ class RefreshLockTimer(Timer):
     threading.Timer implementation for refreshing a lock
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
         self,
         refresh_lock: Callable,
         name: str,

@@ -46,7 +46,7 @@ class RefreshLockTimer:
     param: logger (logging.Logger): The logger to use for logging.
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
         self,
         refresh_lock: Callable,
         name: str,

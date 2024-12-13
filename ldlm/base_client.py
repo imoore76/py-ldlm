@@ -62,7 +62,7 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
     # Minimum time between lock refreshes
     min_refresh_interval_seconds = 10
 
-    def __init__(  # pylint: disable=R0913
+    def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
         self,
         address: str,
         password: Optional[str] = None,
