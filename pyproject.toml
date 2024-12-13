@@ -1,9 +1,59 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+[project]
+name = "py-ldlm"
+requires-python = ">=3.9"
+dynamic = ["version"]
+dependencies = [
+    "grpcio",
+    "google-api-python-client",
+]
+description = "LDLM client library"
+authors = [
+    { name = "Ian Moore", email = "imoore76@yahoo.com" },
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/imoore76/py-ldlm/"
+Documentation = "https://github.com/imoore76/py-ldlm/README.md"
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-asyncio", "frozendict"]
+
+[tool.setuptools_scm]
+
+[tool.setuptools]
+include-package-data=false
+
+[tool.setuptools.packages.find]
+include = ["ldlm*"]
+
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
 [tool.pylint.'MESSAGES CONTROL']
 max-line-length = 100
-# Some code is aio and some is not. Cherry picking small portions of logic into
-# a base class would be more confusing than helpful. Code duplication is ok in
-# this case
-disable = ["duplicate-code", "logging-fstring-interpolation"]
+disable = [
+    # Cherry picking small portions of logic into a base class
+    # would be more confusing than helpful.
+    "duplicate-code",
+    "logging-fstring-interpolation"
+]
 ignore = [".venv", "tests"]
 
 [tool.pylint]
