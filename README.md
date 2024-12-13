@@ -1,6 +1,6 @@
 # py-ldlm
 
-An LDLM server (http://github.com/imoore76/go-ldlm) Python library providing sync and async clients.
+An LDLM (http://github.com/imoore76/go-ldlm) client library providing Python sync and async clients.
 
 ## Installation
 
