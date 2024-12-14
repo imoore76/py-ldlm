@@ -117,6 +117,7 @@ Simple lock context
 ```python
 with c.lock_context("my-task"):
     # Do task
+    pass
 
 ```
 
@@ -124,6 +125,7 @@ Async lock context
 ```python
 async with c.lock_context("my-task")
     # Do task
+    pass
 
 ```
 
@@ -245,11 +247,8 @@ c.unlock("task1-lock", l.key)
 
 Using a lock, it is relatively simple to implement primary / secondary (or secondaries) failover by running something similar to the following in each server application:
 ```python
+# This will block until lock is acquired
 lock = client.lock("application-primary")
-
-if not lock.locked:
-    # This should not happen
-    raise RuntimeException("error: lock returned but not locked")
 
 logger.info("Became primary. Performing work...")
 
@@ -284,9 +283,6 @@ In some applications it may be necessary to limit the number of concurrent opera
 ```python
 # Code in each client to restrict the number of concurrent ElasticSearch operations to 10
 lock = client1.lock("ElasticSearchSlot", size=10)
-
-if not lock.locked:
-    raise RuntimeException("error: lock returned but not locked")
 
 # Perform ES operation
 

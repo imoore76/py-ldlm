@@ -33,14 +33,14 @@ tasks:
       - '**/*.py'
       - '*py'
     generates:
-      - 'dist/py_ldlm-*-py3-none-any.whl'
+      - 'dist/py_ldlm-*.whl'
       - 'dist/py_ldlm-*.tar.gz'
     cmds:
       - rm -rf dist
       - python -m build
 
   publish:
-    desc: "Publish package to test repo"
+    desc: "Publish packages to PyPI"
     preconditions:
       - test "${TWINE_PASSWORD}" != ""
     cmds:
