@@ -68,6 +68,16 @@ tasks:
     cmds:
       - pytest tests
 
+  coverage:
+    desc: "Generate coverage"
+    aliases: ["cov"]
+    sources: 
+      - "**/*.py"
+    cmds:
+      - coverage run -m pytest tests
+      - coverage json
+      - coverage report
+
   clean:
     desc: "Clean up build artifacts and cache"
     cmds:
