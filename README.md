@@ -291,6 +291,21 @@ client1.unlock(lock.name, lock.key)
 
 Remember - the size of a lock is set by the first client that obtains the lock. All subsequent calls to obtain that lock must use the same size parameter.
 
+### Rate limiting
+
+Limit request rate to a service using locks:
+
+```python
+# A client-enforced sliding window of 30 requests per minute.
+
+# This will block until lock is acquired. No need to store reference to lock.
+client1.lock("RateLimitExpensiveService", size=30, lock_timeout_seconds=60)
+
+results = expensive_service.query("getAll")
+
+# Do not unlock. Lock will expire in 60 seconds.
+```
+
 ## Exceptions
 
 The following exceptions are defined in the `exceptions` module and may raised by the client:
