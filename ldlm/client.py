@@ -14,8 +14,6 @@
 """
 This module contains the python client class for the ldlm service.
 """
-from __future__ import annotations
-
 import time
 import logging
 from contextlib import contextmanager
@@ -147,7 +145,7 @@ class Client(BaseClient):
         r: pb2.UnlockResponse = self.rpc_with_retry("Unlock",
                                                     rpc_msg)  # type: ignore
         self._logger.debug(f"Unlock response from server: {r}")
-        if not r.unlocked:
+        if not r.unlocked: # pragma: no cover
             raise RuntimeError(f"Failed to unlock {name}")
 
     def lock(
@@ -363,7 +361,7 @@ class Client(BaseClient):
         Returns:
             None
         """
-        if name in self._lock_timers:
+        if name in self._lock_timers: # pragma: no cover
             raise RuntimeError(f"Lock `{name}` already has a refresh timer")
 
         interval = max(lock_timeout_seconds - 30,
@@ -401,7 +399,7 @@ class Client(BaseClient):
         while True:
             try:
                 resp = rpc_callable(rpc_message, metadata=metadata)
-                if resp.HasField("error"):
+                if resp.HasField("error"): # pragma: no cover
                     raise exceptions.from_rpc_error(resp.error)
                 return resp
             except _InactiveRpcError as e:

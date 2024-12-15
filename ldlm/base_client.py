@@ -129,7 +129,7 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
         self,
         address: str,
         creds: Optional[grpc.ChannelCredentials] = None,
-    ) -> grpc.Channel:
+    ) -> grpc.Channel: # pragma: no cover
         """
         Creates a gRPC channel with the specified address and credentials.
 

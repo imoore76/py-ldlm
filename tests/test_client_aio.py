@@ -15,13 +15,25 @@
 import pytest
 from unittest import mock
 import asyncio
+import contextlib
 import uuid
 
 from grpc._channel import _InactiveRpcError
 from frozendict import frozendict
 
-from ldlm import AsyncClient, TLSConfig, exceptions
+from ldlm import AsyncClient, TLSConfig
 from ldlm.protos import ldlm_pb2 as pb2
+
+class aclosing(contextlib.AbstractAsyncContextManager):
+    """
+    aclosing for python < 3.10
+    """
+    def __init__(self, thing):
+        self.thing = thing
+    async def __aenter__(self):
+        return self.thing
+    async def __aexit__(self, *exc_info):
+        await self.thing.aclose()
 
 
 class MockedAsyncClient(AsyncClient):
@@ -54,8 +66,7 @@ class MockedAsyncClient(AsyncClient):
             Unlock=mock.AsyncMock(side_effect=self.get_unlock_response),
             Lock=mock.AsyncMock(side_effect=self.get_lock_response),
             TryLock=mock.AsyncMock(side_effect=self.get_try_lock_response),
-            RefreshLock=mock.AsyncMock(
-                side_effect=self.get_refresh_lock_response),
+            RefreshLock=mock.AsyncMock(side_effect=self.get_refresh_lock_response),
         )
 
     def get_refresh_lock_response(self, req, metadata=None):
@@ -103,35 +114,27 @@ class TestLock:
         "name,kwargs",
         [
             ("mylock1", frozendict({"lock_timeout_seconds": 10})),
-            ("testlock", frozendict({
-                "lock_timeout_seconds": 0,
-                "size": 10
-            })),
-            ("testlock2", frozendict({
-                "lock_timeout_seconds": None,
-                "size": 0
-            })),
+            ("testlock", frozendict({"lock_timeout_seconds": 0, "size": 10})),
+            ("testlock2", frozendict({"lock_timeout_seconds": None, "size": 0})),
             (
                 "mylock1",
-                frozendict({
-                    "lock_timeout_seconds": 10,
-                    "wait_timeout_seconds": 0
-                }),
+                frozendict({"lock_timeout_seconds": 10, "wait_timeout_seconds": 0}),
             ),
             (
                 "testlock3",
-                frozendict({
-                    "lock_timeout_seconds": 0,
-                    "wait_timeout_seconds": 20,
-                    "size": 22,
-                }),
+                frozendict(
+                    {
+                        "lock_timeout_seconds": 0,
+                        "wait_timeout_seconds": 20,
+                        "size": 22,
+                    }
+                ),
             ),
             (
                 "testlock2",
-                frozendict({
-                    "lock_timeout_seconds": None,
-                    "wait_timeout_seconds": None
-                }),
+                frozendict(
+                    {"lock_timeout_seconds": None, "wait_timeout_seconds": None}
+                ),
             ),
             ("simplelock", frozendict({})),
         ],
@@ -185,47 +188,64 @@ class TestLock:
         "name,kwargs",
         [
             ("mylock1", frozendict({"lock_timeout_seconds": 10})),
-            ("testlock", frozendict({
-                "lock_timeout_seconds": 0,
-                "size": 10,
-            })),
+            (
+                "testlock",
+                frozendict(
+                    {
+                        "lock_timeout_seconds": 0,
+                        "size": 10,
+                    }
+                ),
+            ),
             ("testlock2", frozendict({"lock_timeout_seconds": None})),
             (
                 "mylock1",
-                frozendict({
-                    "lock_timeout_seconds": 10,
-                    "wait_timeout_seconds": 0,
-                }),
+                frozendict(
+                    {
+                        "lock_timeout_seconds": 10,
+                        "wait_timeout_seconds": 0,
+                    }
+                ),
             ),
             (
                 "testlock3",
-                frozendict({
-                    "lock_timeout_seconds": 0,
-                    "wait_timeout_seconds": 20,
-                    "size": 2,
-                }),
+                frozendict(
+                    {
+                        "lock_timeout_seconds": 0,
+                        "wait_timeout_seconds": 20,
+                        "size": 2,
+                    }
+                ),
             ),
             (
                 "testlock2",
-                frozendict({
-                    "lock_timeout_seconds": None,
-                    "size": 0,
-                }),
+                frozendict(
+                    {
+                        "lock_timeout_seconds": None,
+                        "size": 0,
+                    }
+                ),
             ),
             ("simplelock", frozendict({})),
         ],
     )
-    async def test_lock_context(self, client, name, kwargs, locked):
+    async def test_context(self, client, name, kwargs, locked):
         """
-        Test the behavior of the `lock_context` method of the `client` object in different scenarios by using the `pytest.mark.parametrize` decorator to define multiple sets of parameters. 
-        The parameters include the `name`, `kwargs`, and `locked` values. 
+        Test the behavior of the `lock_context` method of the `client` object in different scenarios by using the `pytest.mark.parametrize` decorator to define multiple sets of parameters.
+        The parameters include the `name`, `kwargs`, and `locked` values.
         The function iterates over each set of parameters and performs the following steps:
         1. Mocks the `lock` and `unlock` methods of the `client` object to return specific responses.
         2. Calls the `lock_context` method with the specified parameters and asserts the expected mock calls for the `lock` method.
         3. Asserts the expected mock calls for the `unlock` method based on the `locked` parameter.
         """
-        with mock.patch.object(client, 'lock', return_value=pb2.LockResponse(locked=locked, key="foo")) as lock_mock,\
-                mock.patch.object(client, 'unlock', return_value=pb2.UnlockResponse(unlocked=True)) as unlock_mock:
+        with (
+            mock.patch.object(
+                client, "lock", return_value=pb2.LockResponse(locked=locked, key="foo")
+            ) as lock_mock,
+            mock.patch.object(
+                client, "unlock", return_value=pb2.UnlockResponse(unlocked=True)
+            ) as unlock_mock,
+        ):
             async with client.lock_context(name, **kwargs):
                 pass
 
@@ -248,6 +268,60 @@ class TestLock:
         else:
             assert unlock_mock.mock_calls == []
 
+    async def test_client_instance_timeout(self):
+        """
+        Test the lock method of the client with a client instance lock timeout.
+        """
+        client = MockedAsyncClient(
+            address="localhost:3144",
+            lock_timeout_seconds=10,
+            auto_refresh_locks=False,
+        )
+        l = await client.lock("foo")
+
+        # Assert Lock() was called with the correct gRPC message
+        assert client.stub.Lock.mock_calls == [
+            mock.call(
+                pb2.LockRequest(
+                    name="foo",
+                    lock_timeout_seconds=10,
+                ),
+                metadata=None,
+            )
+        ]
+
+        assert l.locked
+
+    async def test_wait_timeout(self):
+        """
+        Test the lock method of the client with a wait timeout set.
+        """
+        client = MockedAsyncClient(
+            address="localhost:3144",
+            auto_refresh_locks=False,
+        )
+        client.lock_response = pb2.LockResponse(
+                locked=False,
+                error=pb2.Error(
+                code=pb2.ErrorCode.LockWaitTimeout,
+                message="Lock wait timeout exceeded",
+            )
+        )
+
+        l = await client.lock("foo", wait_timeout_seconds=1)
+
+        # Assert Lock() was called with the correct gRPC message
+        assert client.stub.Lock.mock_calls == [
+            mock.call(
+                pb2.LockRequest(
+                    name="foo",
+                    wait_timeout_seconds=1,
+                ),
+                metadata=None,
+            )
+        ]
+
+        assert not l.locked # because the wait timeout was exceeded
 
 @pytest.mark.asyncio
 class TestTryLock:
@@ -256,18 +330,9 @@ class TestTryLock:
     @pytest.mark.parametrize(
         "name,kwargs",
         [
-            ("mylock1", frozendict({
-                "lock_timeout_seconds": 10,
-                "size": 10
-            })),
-            ("testlock", frozendict({
-                "lock_timeout_seconds": 0,
-                "size": 0
-            })),
-            ("testlock2", frozendict({
-                "lock_timeout_seconds": None,
-                "size": 1
-            })),
+            ("mylock1", frozendict({"lock_timeout_seconds": 10, "size": 10})),
+            ("testlock", frozendict({"lock_timeout_seconds": 0, "size": 0})),
+            ("testlock2", frozendict({"lock_timeout_seconds": None, "size": 1})),
             ("simplelock", frozendict({})),
         ],
     )
@@ -316,28 +381,30 @@ class TestTryLock:
         "name,kwargs",
         [
             ("mylock1", frozendict({"lock_timeout_seconds": 10})),
-            ("testlock", frozendict({
-                "lock_timeout_seconds": 0,
-                "size": 3
-            })),
-            ("testlock2", frozendict({
-                "lock_timeout_seconds": None,
-                "size": 0
-            })),
+            ("testlock", frozendict({"lock_timeout_seconds": 0, "size": 3})),
+            ("testlock2", frozendict({"lock_timeout_seconds": None, "size": 0})),
             ("simplelock", frozendict({})),
         ],
     )
-    async def test_try_lock_context(self, client, name, kwargs, locked):
+    async def test_context(self, client, name, kwargs, locked):
         """
-        Test the behavior of the `try_lock_context` method of the `client` object in different scenarios by using the `pytest.mark.parametrize` decorator to define multiple sets of parameters. 
-        The parameters include the `name`, `kwargs`, and `locked` values. 
+        Test the behavior of the `try_lock_context` method of the `client` object in different scenarios by using the `pytest.mark.parametrize` decorator to define multiple sets of parameters.
+        The parameters include the `name`, `kwargs`, and `locked` values.
         The function iterates over each set of parameters and performs the following steps:
         1. Mocks the `try_lock` and `unlock` methods of the `client` object to return specific responses.
         2. Calls the `try_lock_context` method with the specified parameters and asserts the expected mock calls for the `try_lock` method.
         3. Asserts the expected mock calls for the `unlock` method based on the `locked` parameter.
         """
-        with mock.patch.object(client, 'try_lock', return_value=pb2.LockResponse(locked=locked, key="foo")) as lock_mock,\
-                mock.patch.object(client, 'unlock', return_value=pb2.UnlockResponse(unlocked=True)) as unlock_mock:
+        with (
+            mock.patch.object(
+                client,
+                "try_lock",
+                return_value=pb2.LockResponse(locked=locked, key="foo"),
+            ) as lock_mock,
+            mock.patch.object(
+                client, "unlock", return_value=pb2.UnlockResponse(unlocked=True)
+            ) as unlock_mock,
+        ):
             async with client.try_lock_context(name, **kwargs):
                 pass
 
@@ -359,6 +426,28 @@ class TestTryLock:
         else:
             assert unlock_mock.mock_calls == []
 
+    async def test_client_instance_timeout(self):
+        """
+        Test the lock method of the client with a client instance timeout.
+        """
+        client = MockedAsyncClient(
+            address="localhost:3144",
+            lock_timeout_seconds=10,
+            auto_refresh_locks=False,
+        )
+        l = await client.try_lock("foo")
+
+        # Assert TryLock() was called with the correct gRPC message
+        assert client.stub.TryLock.mock_calls == [
+            mock.call(
+                pb2.TryLockRequest(
+                    name="foo",
+                    lock_timeout_seconds=10,
+                ),
+                metadata=None,
+            )
+        ]
+
 
 @pytest.mark.asyncio
 class TestRefreshLock:
@@ -378,9 +467,9 @@ class TestRefreshLock:
         """
         l = await client.refresh_lock(name, key, lock_timeout)
 
-        expected = pb2.RefreshLockRequest(name=name,
-                                          key=key,
-                                          lock_timeout_seconds=lock_timeout)
+        expected = pb2.RefreshLockRequest(
+            name=name, key=key, lock_timeout_seconds=lock_timeout
+        )
 
         assert client.stub.RefreshLock.mock_calls == [
             mock.call(
@@ -403,22 +492,27 @@ class TestRefreshLock:
         """
         with mock.patch.object(client, "min_refresh_interval_seconds", 1):
             async with client.lock_context(
-                    name, lock_timeout_seconds=lock_timeout) as l:
+                name, lock_timeout_seconds=lock_timeout
+            ) as l:
                 await asyncio.sleep(lock_timeout + 0.5)
 
         interval = max(lock_timeout - 30, 1)
         times = max(0, int(lock_timeout / interval))
 
-        expected = pb2.RefreshLockRequest(name=name,
-                                          key=l.key,
-                                          lock_timeout_seconds=lock_timeout)
+        expected = pb2.RefreshLockRequest(
+            name=name, key=l.key, lock_timeout_seconds=lock_timeout
+        )
 
-        assert client.stub.RefreshLock.mock_calls == [
-            mock.call(
-                expected,
-                metadata=None,
-            )
-        ] * times
+        assert (
+            client.stub.RefreshLock.mock_calls
+            == [
+                mock.call(
+                    expected,
+                    metadata=None,
+                )
+            ]
+            * times
+        )
 
 
 @pytest.mark.asyncio
@@ -490,19 +584,25 @@ class TestRpcWithRetry:
         the expected number of times.
         """
         client._retry_delay_seconds = 0
-        client.stub.TryLock = mock.AsyncMock(side_effect=[
-            inactive_rpc_error,
-            inactive_rpc_error,
-            inactive_rpc_error,
-            pb2.LockResponse(locked=True, key="foo"),
-        ])
+        client.stub.TryLock = mock.AsyncMock(
+            side_effect=[
+                inactive_rpc_error,
+                inactive_rpc_error,
+                inactive_rpc_error,
+                pb2.LockResponse(locked=True, key="foo"),
+            ]
+        )
         await client.try_lock("mylock")
-        assert client.stub.TryLock.mock_calls == [
-            mock.call(
-                pb2.TryLockRequest(name="mylock"),
-                metadata=None,
-            )
-        ] * 4
+        assert (
+            client.stub.TryLock.mock_calls
+            == [
+                mock.call(
+                    pb2.TryLockRequest(name="mylock"),
+                    metadata=None,
+                )
+            ]
+            * 4
+        )
 
     async def test_max_retry(self, client, inactive_rpc_error):
         """
@@ -516,20 +616,26 @@ class TestRpcWithRetry:
         """
         client._retry_delay_seconds = 0
         client._retries = 1
-        client.stub.TryLock = mock.AsyncMock(side_effect=[
-            inactive_rpc_error,
-            inactive_rpc_error,
-            inactive_rpc_error,
-            pb2.LockResponse(locked=True, key="foo"),
-        ])
+        client.stub.TryLock = mock.AsyncMock(
+            side_effect=[
+                inactive_rpc_error,
+                inactive_rpc_error,
+                inactive_rpc_error,
+                pb2.LockResponse(locked=True, key="foo"),
+            ]
+        )
         with pytest.raises(inactive_rpc_error):
             await client.try_lock("mylock")
-        assert client.stub.TryLock.mock_calls == [
-            mock.call(
-                pb2.TryLockRequest(name="mylock"),
-                metadata=None,
-            )
-        ] * 2
+        assert (
+            client.stub.TryLock.mock_calls
+            == [
+                mock.call(
+                    pb2.TryLockRequest(name="mylock"),
+                    metadata=None,
+                )
+            ]
+            * 2
+        )
 
     async def test_password(self):
         """
@@ -575,8 +681,7 @@ class TestCreateChannel:
         with mock.patch("ldlm.client.grpc.aio.insecure_channel") as m:
             yield m
 
-    def test_with_ssl_config(self, mock_secure_chan, mock_insecure_chan,
-                             mock_creds):
+    def test_with_ssl_config(self, mock_secure_chan, mock_insecure_chan, mock_creds):
         tls = TLSConfig()
         c = MockedAsyncClient("localhost:3144", tls=tls)
 
@@ -585,11 +690,23 @@ class TestCreateChannel:
         ]
         assert mock_insecure_chan.mock_calls == []
 
-    def test_no_ssl_config(self, mock_secure_chan, mock_insecure_chan,
-                           mock_creds):
+    def test_no_ssl_config(self, mock_secure_chan, mock_insecure_chan, mock_creds):
         c = MockedAsyncClient("localhost:3144", tls=None)
 
         assert mock_secure_chan.mock_calls == []
         assert mock_insecure_chan.mock_calls == [
             mock.call("localhost:3144"),
         ]
+
+@pytest.mark.asyncio
+class TestClosing:
+
+    @pytest.fixture(autouse=True)
+    def mock_contextlib(self):
+        if not hasattr(contextlib, "aclosing"):
+            contextlib.aclosing = aclosing
+
+    async def test_closing(self, client):
+        # This shouldn't raise an exception
+        async with contextlib.aclosing(AsyncClient(address="localhost:3144")) as client:
+            pass

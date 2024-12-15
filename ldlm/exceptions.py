@@ -89,3 +89,9 @@ class LockSizeMismatchError(BaseLDLMException):
     The size of the lock does not match the size specified in the lock request.
     """
     RPC_CODE = 6
+
+class InvalidLockSizeError(BaseLDLMException):
+    """
+    The specified size in the lock request is not valid (>=1).
+    """
+    RPC_CODE = 7
