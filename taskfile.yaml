@@ -73,9 +73,11 @@ tasks:
     aliases: ["cov"]
     sources: 
       - "**/*.py"
+    generates:
+      - "coverage.lcov"
     cmds:
       - coverage run -m pytest tests
-      - coverage json
+      - coverage lcov
       - coverage report
 
   clean:

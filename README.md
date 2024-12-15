@@ -2,8 +2,7 @@
 
 An LDLM (http://github.com/imoore76/go-ldlm) client library providing Python sync and async clients.
 
-<!-- README.md -->
-[![cov](https://imoore76.github.io/py-ldlm/badges/coverage.svg)](https://github.com/imoore76/py-ldlm/actions)
+[![Coverage Status](https://coveralls.io/repos/github/imoore76/py-ldlm/badge.svg?branch=main)](https://coveralls.io/github/imoore76/py-ldlm?branch=main)
 
 ## Installation
 
