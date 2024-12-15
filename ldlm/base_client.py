@@ -46,10 +46,11 @@ def readfile(file_path: Optional[str] = None) -> bytes | None:
 
 
 @dataclass
-class TLSConfig():
+class TLSConfig:
     """
     TLS configuration class
     """
+
     cert_file: Optional[str] = None
     key_file: Optional[str] = None
     ca_file: Optional[str] = None
@@ -59,6 +60,7 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
     """
     Base client class for interacting with the ldlm gRPC server.
     """
+
     # Minimum time between lock refreshes
     min_refresh_interval_seconds = 10
 
@@ -129,7 +131,7 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
         self,
         address: str,
         creds: Optional[grpc.ChannelCredentials] = None,
-    ) -> grpc.Channel: # pragma: no cover
+    ) -> grpc.Channel:  # pragma: no cover
         """
         Creates a gRPC channel with the specified address and credentials.
 

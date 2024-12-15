@@ -172,7 +172,7 @@ class AsyncClient(BaseClient):
         while True:
             try:
                 resp = await rpc_func_callable(rpc_message, metadata=metadata)
-                if resp.HasField("error"): # pragma: no cover
+                if resp.HasField("error"):  # pragma: no cover
                     raise exceptions.from_rpc_error(resp.error)
                 return resp
             except _InactiveRpcError as e:
@@ -455,7 +455,7 @@ class AsyncClient(BaseClient):
             "Unlock", rpc_msg
         )  # type: ignore
         self._logger.debug(f"Unlock response from server: {r}")
-        if not r.unlocked: # pragma: no cover
+        if not r.unlocked:  # pragma: no cover
             raise RuntimeError(f"Failed to unlock `{name}`")
 
     async def _start_refresh(
@@ -474,7 +474,7 @@ class AsyncClient(BaseClient):
         Returns:
             None
         """
-        if name in self._lock_timers: # pragma: no cover
+        if name in self._lock_timers:  # pragma: no cover
             raise RuntimeError(f"Lock `{name}` already has a refresh timer")
 
         interval = max(lock_timeout_seconds - 30, self.min_refresh_interval_seconds)
