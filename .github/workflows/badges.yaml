@@ -26,5 +26,5 @@ jobs:
 
     - run: task coverage
 
-    - run: curl -L https://coveralls.io/coveralls-linux-x86_64.tar.gz | tar -xz -C /usr/local/bin        
+    - run: curl -L https://coveralls.io/coveralls-linux-x86_64.tar.gz | tar -x -C /usr/local/bin        
     - run: coveralls report
