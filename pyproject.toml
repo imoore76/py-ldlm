@@ -66,4 +66,5 @@ disable_error_code = "import-untyped"
 [tool.coverage.run]
 omit = [
     "ldlm/protos/*",
+	"tests/*"
 ]

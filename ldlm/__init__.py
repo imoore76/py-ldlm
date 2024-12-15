@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Put common exports for the ldlm package here.
+Common exports for the ldlm package.
 """
 from .client import Client
 from .client_aio import AsyncClient

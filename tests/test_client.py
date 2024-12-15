@@ -215,7 +215,7 @@ class TestLock:
             ("simplelock", frozendict({})),
         ],
     )
-    def test_lock_context(self, client, name, kwargs, locked):
+    def test_context(self, client, name, kwargs, locked):
         """
         Test the behavior of the `lock_context` method of the `client` object in different scenarios by using the `pytest.mark.parametrize` decorator to define multiple sets of parameters. 
         The parameters include the `name`, `kwargs`, and `locked` values. 
@@ -247,6 +247,61 @@ class TestLock:
             ]
         else:
             assert unlock_mock.mock_calls == []
+
+    def test_instance_timeout(self):
+        """
+        Test the lock method of the client with a client instance lock timeout.
+        """
+        client = MockedClient(
+            address="localhost:3144",
+            lock_timeout_seconds=10,
+            auto_refresh_locks=False,
+        )
+        l = client.lock("foo")
+
+        # Assert Lock() was called with the correct gRPC message
+        assert client.stub.Lock.mock_calls == [
+            mock.call(
+                pb2.LockRequest(
+                    name="foo",
+                    lock_timeout_seconds=10,
+                ),
+                metadata=None,
+            )
+        ]
+
+        assert l.locked
+
+    def test_wait_timeout(self):
+        """
+        Test the lock method of the client with a wait timeout set.
+        """
+        client = MockedClient(
+            address="localhost:3144",
+            auto_refresh_locks=False,
+        )
+        client.lock_response = pb2.LockResponse(
+                locked=False,
+                error=pb2.Error(
+                code=pb2.ErrorCode.LockWaitTimeout,
+                message="Lock wait timeout exceeded",
+            )
+        )
+
+        l = client.lock("foo", wait_timeout_seconds=1)
+
+        # Assert Lock() was called with the correct gRPC message
+        assert client.stub.Lock.mock_calls == [
+            mock.call(
+                pb2.LockRequest(
+                    name="foo",
+                    wait_timeout_seconds=1,
+                ),
+                metadata=None,
+            )
+        ]
+
+        assert not l.locked # because the wait timeout was exceeded
 
 
 class TestTryLock:
@@ -328,7 +383,7 @@ class TestTryLock:
             ("simplelock", frozendict({})),
         ],
     )
-    def test_try_lock_context(self, client, name, kwargs, locked):
+    def test_context(self, client, name, kwargs, locked):
         """
         Test the behavior of the `try_lock_context` method of the `client` object in different scenarios by using the `pytest.mark.parametrize` decorator to define multiple sets of parameters. 
         The parameters include the `name`, `kwargs`, and `locked` values. 
@@ -360,6 +415,29 @@ class TestTryLock:
         else:
             assert unlock_mock.mock_calls == []
 
+    def test_instance_timeout(self):
+        """
+        Test the lock method of the client with a client instance lock timeout.
+        """
+        client = MockedClient(
+            address="localhost:3144",
+            lock_timeout_seconds=10,
+            auto_refresh_locks=False,
+        )
+        l = client.try_lock("foo")
+
+        # Assert Lock() was called with the correct gRPC message
+        assert client.stub.TryLock.mock_calls == [
+            mock.call(
+                pb2.TryLockRequest(
+                    name="foo",
+                    lock_timeout_seconds=10,
+                ),
+                metadata=None,
+            )
+        ]
+
+        assert l.locked
 
 class TestRefreshLock:
 
@@ -591,3 +669,8 @@ class TestCreateChannel:
         assert mock_insecure_chan.mock_calls == [
             mock.call("localhost:3144"),
         ]
+
+class TestClose:
+    def test_close(self):
+        client = Client("localhost:3144")
+        client.close()

@@ -36,6 +36,7 @@ class BaseLDLMException(Exception):
     """
     Base class for all LDLM exceptions.
     """
+
     __slots__ = ("message",)
 
     def __init__(self, message):
@@ -46,6 +47,7 @@ class LDLMError(BaseLDLMException):
     """
     LDLM error.
     """
+
     RPC_CODE = 0
 
 
@@ -53,6 +55,7 @@ class LockDoesNotExistError(BaseLDLMException):
     """
     Lock does not exist error.
     """
+
     RPC_CODE = 1
 
 
@@ -60,6 +63,7 @@ class InvalidLockKeyError(BaseLDLMException):
     """
     Invalid lock key error.
     """
+
     RPC_CODE = 2
 
 
@@ -67,6 +71,7 @@ class LockWaitTimeoutError(BaseLDLMException):
     """
     Lock wait timeout error.
     """
+
     RPC_CODE = 3
 
 
@@ -74,6 +79,7 @@ class NotLockedError(BaseLDLMException):
     """
     Unlock request for a lock that is not locked error.
     """
+
     RPC_CODE = 4
 
 
@@ -81,6 +87,7 @@ class LockDoesNotExistOrInvalidKeyError(BaseLDLMException):
     """
     Lock does not exist or invalid key error.
     """
+
     RPC_CODE = 5
 
 
@@ -88,4 +95,13 @@ class LockSizeMismatchError(BaseLDLMException):
     """
     The size of the lock does not match the size specified in the lock request.
     """
+
     RPC_CODE = 6
+
+
+class InvalidLockSizeError(BaseLDLMException):
+    """
+    The specified size in the lock request is not valid (>=1).
+    """
+
+    RPC_CODE = 7

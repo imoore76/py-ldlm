@@ -56,8 +56,9 @@ class RefreshLockTimer:
         logger: logging.Logger,
     ):
         self.interval: int = interval
-        self.fn: Callable = functools.partial(refresh_lock, name, key,
-                                              lock_timeout_seconds)
+        self.fn: Callable = functools.partial(
+            refresh_lock, name, key, lock_timeout_seconds
+        )
         self.task: asyncio.Task | None = None
         logger.debug(
             f"Refresh timer refreshing lock {name} every {self.interval} seconds."
@@ -146,8 +147,12 @@ class AsyncClient(BaseClient):
     async def rpc_with_retry(
         self,
         rpc_func: str,
-        rpc_message: Union[pb2.LockRequest, pb2.TryLockRequest,
-                           pb2.RefreshLockRequest, pb2.UnlockRequest],
+        rpc_message: Union[
+            pb2.LockRequest,
+            pb2.TryLockRequest,
+            pb2.RefreshLockRequest,
+            pb2.UnlockRequest,
+        ],
     ) -> Union[pb2.LockResponse, pb2.UnlockResponse]:
         """
         Executes an RPC call with retries in case of connection loss.
@@ -167,7 +172,7 @@ class AsyncClient(BaseClient):
         while True:
             try:
                 resp = await rpc_func_callable(rpc_message, metadata=metadata)
-                if resp.HasField("error"):
+                if resp.HasField("error"):  # pragma: no cover
                     raise exceptions.from_rpc_error(resp.error)
                 return resp
             except _InactiveRpcError as e:
@@ -177,12 +182,13 @@ class AsyncClient(BaseClient):
                 self._logger.warning(
                     f"Encountered error {e} while trying rpc_call. "
                     f"Retrying in {self._retry_delay_seconds} seconds "
-                    f"({num_retries} of {self._retries}).")
+                    f"({num_retries} of {self._retries})."
+                )
                 await asyncio.sleep(self._retry_delay_seconds)
 
     async def refresh_lock(
-            self, name: str, key: str,
-            lock_timeout_seconds: int) -> pb2.LockResponse:  # pylint: disable=E1101
+        self, name: str, key: str, lock_timeout_seconds: int
+    ) -> pb2.LockResponse:  # pylint: disable=E1101
         """
         Attempts to refresh a lock.
 
@@ -194,10 +200,12 @@ class AsyncClient(BaseClient):
                 object: The response object returned by the gRPC server indicating the result of
                     the lock attempt.
         """
-        rpc_msg: pb2.RefreshLockRequest = pb2.RefreshLockRequest(  # pylint: disable=E1101
-            name=name,
-            key=key,
-            lock_timeout_seconds=lock_timeout_seconds,
+        rpc_msg: pb2.RefreshLockRequest = (
+            pb2.RefreshLockRequest(  # pylint: disable=E1101
+                name=name,
+                key=key,
+                lock_timeout_seconds=lock_timeout_seconds,
+            )
         )
 
         return await self.rpc_with_retry(
@@ -255,10 +263,11 @@ class AsyncClient(BaseClient):
 
         try:
             self._logger.info(f"Waiting to acquire lock `{name}`")
-            r: pb2.LockResponse = await self.rpc_with_retry("Lock", rpc_msg
-                                                           )  # type: ignore
+            r: pb2.LockResponse = await self.rpc_with_retry(
+                "Lock", rpc_msg
+            )  # type: ignore
         except exceptions.LockWaitTimeoutError:
-            r = pb2.LockResponse(name=name, locked=False)  #pylint: disable=E1101
+            r = pb2.LockResponse(name=name, locked=False)  # pylint: disable=E1101
 
         self._logger.info(f"Lock response from server: {r}")
 
@@ -353,7 +362,8 @@ class AsyncClient(BaseClient):
                 # Lock not acquired, handle accordingly
         """
         rpc_msg: pb2.TryLockRequest = pb2.TryLockRequest(  # pylint: disable=E1101
-            name=name,)
+            name=name,
+        )
         if self._lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
         elif lock_timeout_seconds:
@@ -362,8 +372,9 @@ class AsyncClient(BaseClient):
             rpc_msg.size = size
 
         self._logger.info(f"Attempting to acquire lock `{name}`")
-        r: pb2.LockResponse = await self.rpc_with_retry("TryLock",
-                                                        rpc_msg)  # type: ignore
+        r: pb2.LockResponse = await self.rpc_with_retry(
+            "TryLock", rpc_msg
+        )  # type: ignore
         self._logger.info(f"Lock response from server: {r}")
 
         if r.locked and rpc_msg.lock_timeout_seconds and self._auto_refresh_locks:
@@ -440,14 +451,16 @@ class AsyncClient(BaseClient):
         )
 
         self._logger.debug(f"Unlocking `{name}`")
-        r: pb2.UnlockResponse = await self.rpc_with_retry("Unlock", rpc_msg
-                                                         )  # type: ignore
+        r: pb2.UnlockResponse = await self.rpc_with_retry(
+            "Unlock", rpc_msg
+        )  # type: ignore
         self._logger.debug(f"Unlock response from server: {r}")
-        if not r.unlocked:
+        if not r.unlocked:  # pragma: no cover
             raise RuntimeError(f"Failed to unlock `{name}`")
 
-    async def _start_refresh(self, name: str, key: str,
-                             lock_timeout_seconds: int) -> None:
+    async def _start_refresh(
+        self, name: str, key: str, lock_timeout_seconds: int
+    ) -> None:
         """
         Start the refresh timer for a lock.
 
@@ -461,17 +474,18 @@ class AsyncClient(BaseClient):
         Returns:
             None
         """
-        if name in self._lock_timers:
+        if name in self._lock_timers:  # pragma: no cover
             raise RuntimeError(f"Lock `{name}` already has a refresh timer")
 
-        interval = max(lock_timeout_seconds - 30,
-                       self.min_refresh_interval_seconds)
-        self._lock_timers[name] = RefreshLockTimer(self.refresh_lock,
-                                                   name,
-                                                   key,
-                                                   lock_timeout_seconds,
-                                                   interval=interval,
-                                                   logger=self._logger)
+        interval = max(lock_timeout_seconds - 30, self.min_refresh_interval_seconds)
+        self._lock_timers[name] = RefreshLockTimer(
+            self.refresh_lock,
+            name,
+            key,
+            lock_timeout_seconds,
+            interval=interval,
+            logger=self._logger,
+        )
         await self._lock_timers[name].start()
 
     async def close(self) -> None:

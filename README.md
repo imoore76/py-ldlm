@@ -305,13 +305,14 @@ Limit request rate to a service using locks:
 
 ```python
 # A client-enforced sliding window of 30 requests per minute.
+client = Client("lockserver:3144", auto_refresh_locks=False)
 
 # This will block until lock is acquired. No need to store reference to lock.
-client1.lock("RateLimitExpensiveService", size=30, lock_timeout_seconds=60)
+client.lock("RateLimitExpensiveService", size=30, lock_timeout_seconds=60)
 
 results = expensive_service.query("getAll")
 
-# Do not unlock. Lock will expire in 60 seconds.
+# Do not unlock. Lock will expire in 60 seconds, which enforces the rate window.
 ```
 
 ## Exceptions
