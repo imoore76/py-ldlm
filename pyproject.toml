@@ -67,3 +67,6 @@ disable_error_code = "import-untyped"
 omit = [
     "ldlm/protos/*",
 ]
+
+[tool.coverage.json]
+output = "coverage/coverage-summary.json"
