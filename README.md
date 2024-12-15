@@ -2,6 +2,9 @@
 
 An LDLM (http://github.com/imoore76/go-ldlm) client library providing Python sync and async clients.
 
+<!-- README.md -->
+[![cov](https://imoore76.github.io/py-ldlm/badges/coverage.svg)](https://github.com/imoore76/py-ldlm/actions)
+
 ## Installation
 
 ```

@@ -1,5 +1,6 @@
 .*
 !/.gitignore
 !/.github
+/coverage.*
 /py_ldlm.egg-info
 /dist

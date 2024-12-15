@@ -32,7 +32,7 @@ Repository = "https://github.com/imoore76/py-ldlm/"
 Documentation = "https://github.com/imoore76/py-ldlm/README.md"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-asyncio", "frozendict"]
+test = ["pytest", "pytest-asyncio", "frozendict", "coverage"]
 
 [tool.setuptools_scm]
 
@@ -62,3 +62,8 @@ ignore-patterns = ["ldlm_pb2.*py"]
 [tool.mypy]
 exclude = [ "ldlm/protos/.*" ]
 disable_error_code = "import-untyped"
+
+[tool.coverage.run]
+omit = [
+    "ldlm/protos/*",
+]
