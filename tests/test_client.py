@@ -281,12 +281,11 @@ class TestLock:
             auto_refresh_locks=False,
         )
         client.lock_response = pb2.LockResponse(
-                locked=False,
-                error=pb2.Error(
+            locked=False,
+            error=pb2.Error(
                 code=pb2.ErrorCode.LockWaitTimeout,
                 message="Lock wait timeout exceeded",
-            )
-        )
+            ))
 
         l = client.lock("foo", wait_timeout_seconds=1)
 
@@ -301,7 +300,7 @@ class TestLock:
             )
         ]
 
-        assert not l.locked # because the wait timeout was exceeded
+        assert not l.locked  # because the wait timeout was exceeded
 
 
 class TestTryLock:
@@ -438,6 +437,7 @@ class TestTryLock:
         ]
 
         assert l.locked
+
 
 class TestRefreshLock:
 
@@ -670,7 +670,9 @@ class TestCreateChannel:
             mock.call("localhost:3144"),
         ]
 
+
 class TestClose:
+
     def test_close(self):
         client = Client("localhost:3144")
         client.close()
