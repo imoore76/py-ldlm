@@ -16,6 +16,7 @@ import pytest
 from ldlm import exceptions
 from ldlm.protos import ldlm_pb2 as pb2
 
+
 @pytest.mark.parametrize("code,exception_cls", [
     (0, exceptions.LDLMError),
     (1, exceptions.LockDoesNotExistError),
