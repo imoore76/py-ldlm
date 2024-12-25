@@ -69,11 +69,6 @@ tasks:
       # API docs generated with
       # sphinx-apidoc -e -f -o ./ ../ldlm ../ldlm/protos/ ../ldlm/*client*.py
       # then edited
-      - echo '# License' >LICENSE.md
-      - echo '```' >>LICENSE.md
-      - cat ../LICENSE >>LICENSE.md
-      - echo '```' >>LICENSE.md
-      - cp ../CONTRIBUTING.md ./
       - make clean
       - make html
 
