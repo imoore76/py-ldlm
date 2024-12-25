@@ -84,7 +84,7 @@ class UnlockResponse(_message.Message):
     error: Error
     def __init__(self, unlocked: bool = ..., name: _Optional[str] = ..., error: _Optional[_Union[Error, _Mapping]] = ...) -> None: ...
 
-class RefreshLockRequest(_message.Message):
+class RenewRequest(_message.Message):
     __slots__ = ("name", "key", "lock_timeout_seconds")
     NAME_FIELD_NUMBER: _ClassVar[int]
     KEY_FIELD_NUMBER: _ClassVar[int]

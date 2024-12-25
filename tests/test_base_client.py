@@ -49,7 +49,7 @@ class TestTLSConfig:
         """
         Don't make extra calls to the mocked channel that we want to assert calls for
         """
-        with mock.patch("ldlm.base_client.pb2grpc.LDLMStub"):
+        with mock.patch("ldlm.base_client.ldlm_grpc.LDLMStub"):
             yield
 
     @pytest.fixture

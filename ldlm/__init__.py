@@ -14,9 +14,8 @@
 """
 Common exports for the ldlm package.
 """
-from .client import Client
-from .client_aio import AsyncClient
+from .client import Client, Lock
+from .client_aio import AsyncClient, AsyncLock
 from .base_client import TLSConfig
-from . import exceptions
 
-__all__ = ["Client", "AsyncClient", "exceptions", "TLSConfig"]
+__all__ = ["Client", "AsyncClient", "TLSConfig", "Lock", "AsyncLock"]

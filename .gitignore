@@ -1,7 +1,14 @@
 .*
 !/.gitignore
 !/.github
+!/.readthedocs.yaml
 /coverage*
 /cov.xml
+/lcov.info
 /py_ldlm.egg-info
 /dist
+docs/CONTRIBUTING.md
+docs/LICENSE.md
+docs
+docs/build
+
