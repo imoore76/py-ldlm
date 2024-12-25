@@ -6,14 +6,12 @@ import os
 import sys
 from setuptools_scm import get_version
 
-print(get_version(root=os.path.abspath('../')))
-
 sys.path.insert(0, os.path.abspath('../ldlm'))
 
 project = 'py-ldlm'
 copyright = '2024, Google LLC'
 author = 'Ian Moore'
-release = get_version(root=os.path.abspath('../'))
+release = '1.0.0' #get_version(root=os.path.abspath('../'))
 
 extensions = [
     'myst_parser',

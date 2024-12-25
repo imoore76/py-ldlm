@@ -43,8 +43,8 @@ Timeout
 ------------
 .. note::
     
-    Most users will not to set a timeout just to mitigate deadlocks
-    because client disconnects trigger a release of all locks held by the client.
+    Most users will **not** need to set a timeout for the purpose of mitigating
+    deadlocks because client disconnects trigger a release of all locks held by the client.
 
 Locks can have a timeout (defaults to: None). This specifies the maximum amount of
 time a lock can remain locked without being renewed. If the lock is not renewed in time,
