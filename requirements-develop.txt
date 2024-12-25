@@ -1,4 +1,4 @@
--e .[test]
+-e .[test,docs]
 
 grpcio-tools
 pylint
@@ -7,4 +7,3 @@ mypy
 build
 2to3
 twine
-

@@ -33,6 +33,7 @@ Documentation = "https://github.com/imoore76/py-ldlm/README.md"
 
 [project.optional-dependencies]
 test = ["pytest", "pytest-asyncio", "frozendict", "coverage"]
+docs = ["sphinx", "sphinx_rtd_theme", "autodoc", "myst-parser", "setuptools-scm>=8"]
 
 [tool.setuptools_scm]
 

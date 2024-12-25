@@ -23,6 +23,7 @@ from frozendict import frozendict
 
 from ldlm import AsyncClient, TLSConfig
 from ldlm.protos import ldlm_pb2 as pb2
+from ldlm.client_aio import AsyncLock
 
 
 class aclosing(contextlib.AbstractAsyncContextManager):
@@ -47,7 +48,7 @@ class MockedAsyncClient(AsyncClient):
         Initializes a new instance of the class.
 
         Initializes the following instance variables:
-            - refresh_lock_response (None): The response for the refresh lock operation.
+            - renew_lock_response (None): The response for the renew lock operation.
             - unlock_response (None): The response for the unlock operation.
             - lock_response (None): The response for the lock operation.
             - try_lock_response (None): The response for the try lock operation.
@@ -56,26 +57,25 @@ class MockedAsyncClient(AsyncClient):
 
         Creates a MagicMock object for the stub with the following methods:
             - Unlock: A mock AsyncMock that calls the get_unlock_response method.
-            - Lock: A mock AsyncMock that calls the get_lock_response method.
+            - Lock: A mock Lock that calls the get_lock_response method.
             - TryLock: A mock AsyncMock that calls the get_try_lock_response method.
-            - RefreshLock: A mock AsyncMock that calls the get_refresh_lock_response method.
+            - Renew: A mock AsyncMock that calls the get_renew_lock_response method.
         """
-        self.refresh_lock_response = None
+        self.renew_lock_response = None
         self.unlock_response = None
         self.lock_response = None
         self.try_lock_response = None
 
         super().__init__(*args, **kwargs)
-        self.stub = mock.MagicMock(
+        self._stub = mock.MagicMock(
             Unlock=mock.AsyncMock(side_effect=self.get_unlock_response),
             Lock=mock.AsyncMock(side_effect=self.get_lock_response),
             TryLock=mock.AsyncMock(side_effect=self.get_try_lock_response),
-            RefreshLock=mock.AsyncMock(
-                side_effect=self.get_refresh_lock_response),
+            Renew=mock.AsyncMock(side_effect=self.get_renew_lock_response),
         )
 
-    def get_refresh_lock_response(self, req, metadata=None):
-        assert isinstance(req, pb2.RefreshLockRequest)
+    def get_renew_lock_response(self, req, metadata=None):
+        assert isinstance(req, pb2.RenewRequest)
         return pb2.LockResponse(
             locked=True,
             name=req.name,
@@ -108,13 +108,13 @@ class MockedAsyncClient(AsyncClient):
 
 @pytest.fixture
 def client():
-    return MockedAsyncClient(address="localhost:3144")
+    return MockedAsyncClient(address="ldlm-server:3144")
 
 
 @pytest.mark.asyncio
 class TestLock:
 
-    @pytest.mark.parametrize("auto_refresh", [True, False])
+    @pytest.mark.parametrize("auto_renew", [True, False])
     @pytest.mark.parametrize(
         "name,kwargs",
         [
@@ -152,30 +152,30 @@ class TestLock:
             ("simplelock", frozendict({})),
         ],
     )
-    async def test_lock(self, name, kwargs, auto_refresh, client):
+    async def test_lock(self, name, kwargs, auto_renew, client):
         """
         Test the lock method of the client.
 
         This test function uses the pytest.mark.parametrize decorator to define multiple sets of parameters for the test.
-        The parameters include the lock name, keyword arguments, and the auto_refresh flag.
+        The parameters include the lock name, keyword arguments, and the auto_renew flag.
         The function iterates over each set of parameters and performs the following steps:
-        1. Sets the _auto_refresh_locks attribute of the client to the value of the auto_refresh flag.
-        2. Uses the mock.patch.object decorator to patch the _start_refresh method of the client.
+        1. Sets the _auto_renew_locks attribute of the client to the value of the auto_renew flag.
+        2. Uses the mock.patch.object decorator to patch the _start_renew method of the client.
         3. Calls the lock method of the client with the provided name and keyword arguments.
-        4. Checks if the _start_refresh method was called with the correct arguments if auto_refresh is True and lock_timeout_seconds is provided.
-        5. Checks if the _start_refresh method was not called if auto_refresh is False.
-        6. Creates a LockRequest object with the provided name and sets the lock_timeout_seconds and wait_timeout_seconds attributes if provided.
-        7. Asserts that the Lock method of the client's stub was called with the expected LockRequest object and metadata=None.
+        4. Checks if the _start_renew method was called with the correct arguments if auto_renew is True and lock_timeout_seconds is provided.
+        5. Checks if the _start_renew method was not called if auto_renew is False.
+        6. Creates a AsyncLockRequest object with the provided name and sets the lock_timeout_seconds and wait_timeout_seconds attributes if provided.
+        7. Asserts that the AsyncLock method of the client's stub was called with the expected AsyncLockRequest object and metadata=None.
         """
-        client._auto_refresh_locks = auto_refresh
+        client._auto_renew_locks = auto_renew
 
-        with mock.patch.object(client, "_start_refresh") as sr_mock:
+        with mock.patch.object(client, "_start_renew") as sr_mock:
             l = await client.lock(name, **kwargs)
 
-        # If auto_refresh is True and there is a lock timeout, _start_refresh should have been called
-        if auto_refresh and kwargs.get("lock_timeout_seconds"):
+        # If auto_renew is True and there is a lock timeout, _start_renew should have been called
+        if auto_renew and kwargs.get("lock_timeout_seconds"):
             assert sr_mock.mock_calls == [
-                mock.call(name, l.key, kwargs["lock_timeout_seconds"]),
+                mock.call(l, kwargs["lock_timeout_seconds"]),
             ]
         else:
             assert sr_mock.mock_calls == []
@@ -188,8 +188,8 @@ class TestLock:
         if kwargs.get("size"):
             expected.size = kwargs["size"]
 
-        # Assert Lock() was called with the correct gRPC message
-        assert client.stub.Lock.mock_calls == [
+        # Assert AsyncLock() was called with the correct gRPC message
+        assert client._stub.Lock.mock_calls == [
             mock.call(
                 expected,
                 metadata=None,
@@ -246,8 +246,11 @@ class TestLock:
         with (
                 mock.patch.object(client,
                                   "lock",
-                                  return_value=pb2.LockResponse(locked=locked,
-                                                                key="foo")) as
+                                  return_value=AsyncLock(
+                                      client,
+                                      pb2.LockResponse(name=name,
+                                                       locked=locked,
+                                                       key="foo"))) as
                 lock_mock,
                 mock.patch.object(
                     client,
@@ -282,14 +285,14 @@ class TestLock:
         Test the lock method of the client with a client instance lock timeout.
         """
         client = MockedAsyncClient(
-            address="localhost:3144",
+            address="ldlm-server:3144",
             lock_timeout_seconds=10,
-            auto_refresh_locks=False,
+            auto_renew_locks=False,
         )
         l = await client.lock("foo")
 
-        # Assert Lock() was called with the correct gRPC message
-        assert client.stub.Lock.mock_calls == [
+        # Assert AsyncLock() was called with the correct gRPC message
+        assert client._stub.Lock.mock_calls == [
             mock.call(
                 pb2.LockRequest(
                     name="foo",
@@ -306,8 +309,8 @@ class TestLock:
         Test the lock method of the client with a wait timeout set.
         """
         client = MockedAsyncClient(
-            address="localhost:3144",
-            auto_refresh_locks=False,
+            address="ldlm-server:3144",
+            auto_renew_locks=False,
         )
         client.lock_response = pb2.LockResponse(
             locked=False,
@@ -318,8 +321,8 @@ class TestLock:
 
         l = await client.lock("foo", wait_timeout_seconds=1)
 
-        # Assert Lock() was called with the correct gRPC message
-        assert client.stub.Lock.mock_calls == [
+        # Assert AsyncLock() was called with the correct gRPC message
+        assert client._stub.Lock.mock_calls == [
             mock.call(
                 pb2.LockRequest(
                     name="foo",
@@ -335,7 +338,7 @@ class TestLock:
 @pytest.mark.asyncio
 class TestTryLock:
 
-    @pytest.mark.parametrize("auto_refresh", [True, False])
+    @pytest.mark.parametrize("auto_renew", [True, False])
     @pytest.mark.parametrize(
         "name,kwargs",
         [
@@ -354,29 +357,29 @@ class TestTryLock:
             ("simplelock", frozendict({})),
         ],
     )
-    async def test_try_lock(self, name, kwargs, auto_refresh, client):
+    async def test_try_lock(self, name, kwargs, auto_renew, client):
         """
         Test the try_lock method of the client.
 
         This test function uses the pytest.mark.parametrize decorator to define multiple sets of parameters for the test.
-        The parameters include the lock name, keyword arguments, and the auto_refresh flag.
+        The parameters include the lock name, keyword arguments, and the auto_renew flag.
         The function iterates over each set of parameters and performs the following steps:
-        1. Sets the _auto_refresh_locks attribute of the client to the value of the auto_refresh flag.
-        2. Uses the mock.patch.object decorator to patch the _start_refresh method of the client.
+        1. Sets the _auto_renew_locks attribute of the client to the value of the auto_renew flag.
+        2. Uses the mock.patch.object decorator to patch the _start_renew method of the client.
         3. Calls the try_lock method of the client with the provided name and keyword arguments.
-        4. Checks if the _start_refresh method was called with the correct arguments if auto_refresh is True and lock_timeout_seconds is provided.
-        5. Checks if the _start_refresh method was not called if auto_refresh is False.
+        4. Checks if the _start_renew method was called with the correct arguments if auto_renew is True and lock_timeout_seconds is provided.
+        5. Checks if the _start_renew method was not called if auto_renew is False.
         6. Creates a TryLockRequest object with the provided name and sets the lock_timeout_seconds attribute if provided.
         7. Asserts that the TryLock method of the client's stub was called with the expected TryLockRequest object and metadata=None.
         """
-        client._auto_refresh_locks = auto_refresh
+        client._auto_renew_locks = auto_renew
 
-        with mock.patch.object(client, "_start_refresh") as sr_mock:
+        with mock.patch.object(client, "_start_renew") as sr_mock:
             l = await client.try_lock(name, **kwargs)
 
-        if auto_refresh and kwargs.get("lock_timeout_seconds"):
+        if auto_renew and kwargs.get("lock_timeout_seconds"):
             assert sr_mock.mock_calls == [
-                mock.call(name, l.key, kwargs["lock_timeout_seconds"]),
+                mock.call(l, kwargs["lock_timeout_seconds"]),
             ]
         else:
             assert sr_mock.mock_calls == []
@@ -387,7 +390,7 @@ class TestTryLock:
         if kwargs.get("size"):
             expected.size = kwargs["size"]
 
-        assert client.stub.TryLock.mock_calls == [
+        assert client._stub.TryLock.mock_calls == [
             mock.call(
                 expected,
                 metadata=None,
@@ -423,7 +426,9 @@ class TestTryLock:
                 mock.patch.object(
                     client,
                     "try_lock",
-                    return_value=pb2.LockResponse(locked=locked, key="foo"),
+                    return_value=AsyncLock(
+                        client,
+                        pb2.LockResponse(locked=locked, key="foo", name=name)),
                 ) as lock_mock,
                 mock.patch.object(
                     client,
@@ -457,14 +462,14 @@ class TestTryLock:
         Test the lock method of the client with a client instance timeout.
         """
         client = MockedAsyncClient(
-            address="localhost:3144",
+            address="ldlm-server:3144",
             lock_timeout_seconds=10,
-            auto_refresh_locks=False,
+            auto_renew_locks=False,
         )
         l = await client.try_lock("foo")
 
         # Assert TryLock() was called with the correct gRPC message
-        assert client.stub.TryLock.mock_calls == [
+        assert client._stub.TryLock.mock_calls == [
             mock.call(
                 pb2.TryLockRequest(
                     name="foo",
@@ -476,7 +481,7 @@ class TestTryLock:
 
 
 @pytest.mark.asyncio
-class TestRefreshLock:
+class TestRenew:
 
     @pytest.mark.parametrize(
         "name,key,lock_timeout",
@@ -487,17 +492,17 @@ class TestRefreshLock:
             ("simplelock", "foo", 9),
         ],
     )
-    async def test_refresh_lock(self, name, key, lock_timeout, client):
+    async def test_renew(self, name, key, lock_timeout, client):
         """
-        Test the refresh_lock method of the client with different parameter values.
+        Test the renew_lock method of the client with different parameter values.
         """
-        l = await client.refresh_lock(name, key, lock_timeout)
+        l = await client.renew(name, key, lock_timeout)
 
-        expected = pb2.RefreshLockRequest(name=name,
-                                          key=key,
-                                          lock_timeout_seconds=lock_timeout)
+        expected = pb2.RenewRequest(name=name,
+                                    key=key,
+                                    lock_timeout_seconds=lock_timeout)
 
-        assert client.stub.RefreshLock.mock_calls == [
+        assert client._stub.Renew.mock_calls == [
             mock.call(
                 expected,
                 metadata=None,
@@ -512,11 +517,11 @@ class TestRefreshLock:
             ("simplenone", 0),
         ],
     )
-    async def test_auto_refresh(self, name, lock_timeout, client):
+    async def test_auto_renew(self, name, lock_timeout, client):
         """
-        Test the auto_refresh feature of the client with different parameter values.
+        Test the auto_renew feature of the client with different parameter values.
         """
-        with mock.patch.object(client, "min_refresh_interval_seconds", 1):
+        with mock.patch.object(client, "min_renew_interval_seconds", 1):
             async with client.lock_context(
                     name, lock_timeout_seconds=lock_timeout) as l:
                 await asyncio.sleep(lock_timeout + 0.5)
@@ -524,11 +529,11 @@ class TestRefreshLock:
         interval = max(lock_timeout - 30, 1)
         times = max(0, int(lock_timeout / interval))
 
-        expected = pb2.RefreshLockRequest(name=name,
-                                          key=l.key,
-                                          lock_timeout_seconds=lock_timeout)
+        expected = pb2.RenewRequest(name=name,
+                                    key=l.key,
+                                    lock_timeout_seconds=lock_timeout)
 
-        assert (client.stub.RefreshLock.mock_calls ==
+        assert (client._stub.Renew.mock_calls ==
                 [mock.call(
                     expected,
                     metadata=None,
@@ -555,16 +560,16 @@ class TestUnlock:
 
         expected = pb2.UnlockRequest(name=name, key=key)
 
-        assert client.stub.Unlock.mock_calls == [
+        assert client._stub.Unlock.mock_calls == [
             mock.call(
                 expected,
                 metadata=None,
             )
         ]
 
-    async def test_remove_refresh_timer(self, client):
+    async def test_remove_renew_timer(self, client):
         """
-        Test the remove_refresh_timer method of the client with different parameter values.
+        Test the remove_renew_timer method of the client with different parameter values.
         """
         l = await client.lock("mylock", lock_timeout_seconds=40)
 
@@ -598,20 +603,20 @@ class TestRpcWithRetry:
         Test the retry mechanism of the client when it encounters a few errors.
 
         This test function verifies that the client correctly retries the RPC call when it encounters
-        specific errors. It sets up a mock for the `TryLock` method of the `client.stub` object to return
+        specific errors. It sets up a mock for the `TryLock` method of the `client._stub` object to return
         the specified side effects, which include the `inactive_rpc_error` exception. The test then calls
         the `client.try_lock` method with the name "mylock" and asserts that the `TryLock` method was called
         the expected number of times.
         """
         client._retry_delay_seconds = 0
-        client.stub.TryLock = mock.AsyncMock(side_effect=[
+        client._stub.TryLock = mock.AsyncMock(side_effect=[
             inactive_rpc_error,
             inactive_rpc_error,
             inactive_rpc_error,
             pb2.LockResponse(locked=True, key="foo"),
         ])
         await client.try_lock("mylock")
-        assert (client.stub.TryLock.mock_calls ==
+        assert (client._stub.TryLock.mock_calls ==
                 [mock.call(
                     pb2.TryLockRequest(name="mylock"),
                     metadata=None,
@@ -622,14 +627,14 @@ class TestRpcWithRetry:
         Test the retry mechanism of the client when it encounters a few errors.
 
         This test function verifies that the client correctly retries the RPC call when it encounters
-        specific errors. It sets up a mock for the `TryLock` method of the `client.stub` object to return
+        specific errors. It sets up a mock for the `TryLock` method of the `client._stub` object to return
         the specified side effects, which include the `inactive_rpc_error` exception. The test then calls
         the `client.try_lock` method with the name "mylock" and asserts that the `TryLock` method was called
         the expected number of times.
         """
         client._retry_delay_seconds = 0
         client._retries = 1
-        client.stub.TryLock = mock.AsyncMock(side_effect=[
+        client._stub.TryLock = mock.AsyncMock(side_effect=[
             inactive_rpc_error,
             inactive_rpc_error,
             inactive_rpc_error,
@@ -637,7 +642,7 @@ class TestRpcWithRetry:
         ])
         with pytest.raises(inactive_rpc_error):
             await client.try_lock("mylock")
-        assert (client.stub.TryLock.mock_calls ==
+        assert (client._stub.TryLock.mock_calls ==
                 [mock.call(
                     pb2.TryLockRequest(name="mylock"),
                     metadata=None,
@@ -649,12 +654,12 @@ class TestRpcWithRetry:
 
         This test function creates an instance of the `MockedAsyncClient` class with a password
         authentication. It then calls the `try_lock` method with the lock name "mylock". The test
-        asserts that the `TryLock` method of the `c.stub` object was called with the correct
+        asserts that the `TryLock` method of the `c._stub` object was called with the correct
         arguments, including the authorization metadata containing the password.
         """
-        c = MockedAsyncClient("localhost:3144", password="asdf1234")
+        c = MockedAsyncClient("ldlm-server:3144", password="asdf1234")
         await c.try_lock("mylock")
-        assert c.stub.TryLock.mock_calls == [
+        assert c._stub.TryLock.mock_calls == [
             mock.call(
                 pb2.TryLockRequest(name="mylock"),
                 metadata=(("authorization", "asdf1234"),),
@@ -669,7 +674,7 @@ class TestCreateChannel:
         """
         Don't make extra calls to the mocked channel that we want to assert calls for
         """
-        with mock.patch("ldlm.base_client.pb2grpc.LDLMStub"):
+        with mock.patch("ldlm.base_client.ldlm_grpc.LDLMStub"):
             yield
 
     @pytest.fixture
@@ -690,20 +695,20 @@ class TestCreateChannel:
     def test_with_ssl_config(self, mock_secure_chan, mock_insecure_chan,
                              mock_creds):
         tls = TLSConfig()
-        c = MockedAsyncClient("localhost:3144", tls=tls)
+        c = MockedAsyncClient("ldlm-server:3144", tls=tls)
 
         assert mock_secure_chan.mock_calls == [
-            mock.call("localhost:3144", mock_creds.return_value),
+            mock.call("ldlm-server:3144", mock_creds.return_value),
         ]
         assert mock_insecure_chan.mock_calls == []
 
     def test_no_ssl_config(self, mock_secure_chan, mock_insecure_chan,
                            mock_creds):
-        c = MockedAsyncClient("localhost:3144", tls=None)
+        c = MockedAsyncClient("ldlm-server:3144", tls=None)
 
         assert mock_secure_chan.mock_calls == []
         assert mock_insecure_chan.mock_calls == [
-            mock.call("localhost:3144"),
+            mock.call("ldlm-server:3144"),
         ]
 
 
@@ -718,5 +723,32 @@ class TestClosing:
     async def test_closing(self, client):
         # This shouldn't raise an exception
         async with contextlib.aclosing(
-                AsyncClient(address="localhost:3144")) as client:
+                AsyncClient(address="ldlm-server:3144")) as client:
             pass
+
+
+class TestLockClass:
+
+    @pytest.mark.asyncio
+    async def test_unlock_not_locked(self):
+        lock = AsyncLock(None, pb2.LockResponse(locked=False))
+        with pytest.raises(RuntimeError) as ex:
+            await lock.unlock()
+        assert str(ex.value) == "unlock() called on unlocked lock"
+
+    @pytest.mark.asyncio
+    async def test_renew_not_not_locked(self):
+        lock = AsyncLock(None, pb2.LockResponse(locked=False))
+        with pytest.raises(RuntimeError) as ex:
+            await lock.renew(1)
+        assert str(ex.value) == "renew() called on unlocked lock"
+
+    @pytest.mark.parametrize("locked", [True, False])
+    def test_no_client_if_unlocked(self, client, locked):
+        lock = AsyncLock(client, pb2.LockResponse(locked=locked))
+        assert (lock._client is None) == (not locked)
+
+    @pytest.mark.parametrize("locked", [True, False])
+    def test_bool(self, client, locked):
+        lock = AsyncLock(client, pb2.LockResponse(locked=locked))
+        assert bool(lock) is locked

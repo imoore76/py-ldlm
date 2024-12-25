@@ -11,31 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
 """
-This module contains the exception classes for the ldlm service.
+Exception classes for the LDLM service.
 """
+from typing import Union
+from ldlm.protos import ldlm_pb2 as pb2
 
 
-def from_rpc_error(rpc_error):
-    """
-    Converts an RPC error into a corresponding LDLM exception.
-
-    param rpc_error: The RPC error to convert.
-
-    Returns:
-        BaseLDLMException: The corresponding LDLM exception.
-
-    """
-    for cls in BaseLDLMException.__subclasses__():
-        if rpc_error.code == cls.RPC_CODE:
-            return cls(rpc_error.message)
-    return LDLMError(rpc_error.message)
-
-
-class BaseLDLMException(Exception):
+class _BaseLDLMException(Exception):
     """
     Base class for all LDLM exceptions.
     """
+    RPC_CODE = -1
 
     __slots__ = ("message",)
 
@@ -43,65 +31,89 @@ class BaseLDLMException(Exception):
         self.message = message
 
 
-class LDLMError(BaseLDLMException):
+class LDLMError(_BaseLDLMException):
     """
-    LDLM error.
+    Generic LDLM error.
     """
 
     RPC_CODE = 0
 
 
-class LockDoesNotExistError(BaseLDLMException):
+class LockDoesNotExistError(_BaseLDLMException):
     """
-    Lock does not exist error.
+    Lock does not exist error. This can occur when attempting to unlock or renew a lock that
+    does not exist.
     """
 
     RPC_CODE = 1
 
 
-class InvalidLockKeyError(BaseLDLMException):
+class InvalidLockKeyError(_BaseLDLMException):
     """
-    Invalid lock key error.
+    Invalid lock key error. The key specified in the request is not valid.
     """
 
     RPC_CODE = 2
 
 
-class LockWaitTimeoutError(BaseLDLMException):
+class LockWaitTimeoutError(_BaseLDLMException):
     """
-    Lock wait timeout error.
+    Lock wait timeout error. The lock could not be acquired in `wait_timeout_seconds` seconds.
     """
 
     RPC_CODE = 3
 
 
-class NotLockedError(BaseLDLMException):
+class NotLockedError(_BaseLDLMException):
     """
-    Unlock request for a lock that is not locked error.
+    Lock is not locked error. This can occur when attempting to renew or unlock a lock that
+    is not locked.
     """
 
     RPC_CODE = 4
 
 
-class LockDoesNotExistOrInvalidKeyError(BaseLDLMException):
+class LockDoesNotExistOrInvalidKeyError(_BaseLDLMException):
     """
-    Lock does not exist or invalid key error.
+    Lock does not exist or invalid key error. This can occur when renewing a lock using an
+    invalid name or key.
     """
 
     RPC_CODE = 5
 
 
-class LockSizeMismatchError(BaseLDLMException):
+class LockSizeMismatchError(_BaseLDLMException):
     """
-    The size of the lock does not match the size specified in the lock request.
+    The size of the lock in the LDLM server does not match the size specified. A previous lock
+    request was made with a different size.
     """
 
     RPC_CODE = 6
 
 
-class InvalidLockSizeError(BaseLDLMException):
+class InvalidLockSizeError(_BaseLDLMException):
     """
-    The specified size in the lock request is not valid (>=1).
+    The specified size in the lock request is not a valid size (must be > 0).
     """
 
     RPC_CODE = 7
+
+
+def from_rpc_error(
+    rpc_error: pb2.Error
+) -> Union[LDLMError, LockDoesNotExistError, InvalidLockKeyError,
+           LockWaitTimeoutError, NotLockedError,
+           LockDoesNotExistOrInvalidKeyError, LockSizeMismatchError,
+           InvalidLockSizeError]:
+    """
+    Converts an LDLM error into a corresponding exception.
+
+    param rpc_error: The LDLM error to convert.
+
+    Returns:
+        An exception.
+    """
+    for cls in _BaseLDLMException.__subclasses__():
+        if rpc_error.code == cls.RPC_CODE:  # type: ignore
+            return cls(rpc_error.message)  # type: ignore
+    return LDLMError(rpc_error.message)

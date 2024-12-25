@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This module defines the base client class for interacting with the ldlm gRPC server and associated
-TLSConfig class for TLS configuration.
+Base client class for interacting with the LDLM gRPC server and TLSConfig class for
+LDLM client TLS configuration.
 """
 from __future__ import annotations
 
@@ -24,14 +24,14 @@ from typing import Optional, Any
 
 import grpc
 
-from ldlm.protos import ldlm_pb2_grpc as pb2grpc
+from ldlm.protos import ldlm_pb2_grpc as ldlm_grpc
 
 
 def readfile(file_path: Optional[str] = None) -> bytes | None:
     """
     Reads the entire contents of a file.
 
-    param: file_path (str, optional): The path to the file to read. If None, an empty string is
+    file_path (str, optional): The path to the file to read. If None, an empty string is
         returned.
 
     Returns:
@@ -48,21 +48,27 @@ def readfile(file_path: Optional[str] = None) -> bytes | None:
 @dataclass
 class TLSConfig:
     """
-    TLS configuration class
+    TLS configuration dataclass for LDLM client. Pass an instance of this class as the `tls`
+    parameter to an LDLM client constructor.
     """
 
     cert_file: Optional[str] = None
+    """Path to the client certificate file"""
+
     key_file: Optional[str] = None
+    """Path to the client key file"""
+
     ca_file: Optional[str] = None
+    """Path to the CA certificate file"""
 
 
-class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
+class BaseClient(abc.ABC):  # pylint: disable=too-few-public-methods,too-many-instance-attributes
     """
-    Base client class for interacting with the ldlm gRPC server.
+    Base client class for interacting with the LDLM gRPC server.
     """
 
-    # Minimum time between lock refreshes
-    min_refresh_interval_seconds = 10
+    min_renew_interval_seconds: int = 10
+    """minimum time between lock renews in seconds"""
 
     def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
         self,
@@ -71,21 +77,20 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
         tls: Optional[TLSConfig] = None,
         retries: int = -1,
         retry_delay_seconds: int = 5,
-        auto_refresh_locks: bool = True,
+        auto_renew_locks: bool = True,
         lock_timeout_seconds: int = 0,
     ):
         """
-        Initializes a new instance of the class.
-
-        param: address (str): The address of the server.
-        param: password (str, optional): The password to use for authentication. Defaults to None.
-        param: tls (TLSConfig, optional): TLS configuration. Defaults to None.
-        param: retries (int, optional): The number of retries to attempt. Defaults to -1
-            (infinite). 0 to disable retries
-        param: retry_delay_seconds (int, optional): The delay in seconds between retry attempts.
-        param: auto_refresh_locks (bool, optional): Automatically refreshed at an appropriate
-            interval using a RefreshLockTimer thread
-        param: lock_timeout (int, optional): The lock timeout to use for all lock operations
+        Args:
+            address (str): The address of the server.
+            password (str, optional): The password to use for authentication. Defaults to None.
+            tls (TLSConfig, optional): TLS configuration. Leave `None` (default) to disable TLS.
+            retries (int, optional): The number of retries to attempt. Defaults to `-1`
+                (infinite). Set to `0` to disable retries
+            retry_delay_seconds (int, optional): The delay in seconds between retry attempts.
+            auto_renew_locks (bool, optional): Automatically renew locks using a background
+                thread or asyncio task
+            lock_timeout (int, optional): The lock timeout to use for all lock operations
         """
 
         if tls is not None:
@@ -97,19 +102,19 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
         else:
             creds = None
 
-        self._channel = self._create_channel(address, creds)
+        self._channel: grpc.Channel = self._create_channel(address, creds)
 
         # Number of times to retry each request in case of failure
         self._retries: int = retries
 
-        # Auto-refresh locks at an appropriate interval
-        self._auto_refresh_locks: bool = auto_refresh_locks
+        # Auto-renew locks at an appropriate interval
+        self._auto_renew_locks: bool = auto_renew_locks
 
         # Need password for RPC calls
         self._password: Optional[str] = password
 
         # Hold ref to client for gRPC calls
-        self.stub: pb2grpc.LDLMStub = pb2grpc.LDLMStub(self._channel)
+        self._stub: ldlm_grpc.LDLMStub = ldlm_grpc.LDLMStub(self._channel)
 
         # Hold ref to lock timers so they can be canceled when unlocking
         self._lock_timers: dict[str, Any] = {}
@@ -133,16 +138,6 @@ class BaseClient(abc.ABC):  # pylint: disable=R0903,R0902
         creds: Optional[grpc.ChannelCredentials] = None,
     ) -> grpc.Channel:  # pragma: no cover
         """
-        Creates a gRPC channel with the specified address and credentials.
-
-        param: address (str): The address of the gRPC server.
-        param: creds (Optional[grpc.ChannelCredentials], optional): The credentials to use for the
-            channel. Defaults to None.
-
-        Returns:
-            grpc.Channel: The created gRPC channel.
-
-        Raises:
-            NotImplementedError: If the method is not implemented in the subclass.
+        Abstract method that creates a gRPC channel with the specified address and credentials.
         """
         raise NotImplementedError("_create_channel not implemented")

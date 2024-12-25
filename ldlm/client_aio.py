@@ -1,5 +1,3 @@
-#!/usr/bin/python
-#
 # Copyright 2024 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This module contains the asyncio python client class for the ldlm service.
+Python asyncio AsyncClient class and helpers for the LDLM service.
 """
 from __future__ import annotations
 
@@ -30,45 +28,113 @@ from grpc._channel import _InactiveRpcError
 from ldlm import exceptions
 from ldlm.base_client import BaseClient
 
-from ldlm.protos import ldlm_pb2 as pb2
+from ldlm.protos import ldlm_pb2 as pb
 
 
-class RefreshLockTimer:
+class AsyncLock:
     """
-    Timer implementation for refreshing a lock
-
-    param: refresh_lock (Callable): The function to call to refresh the lock.
-    param: name (str): The name of the lock to refresh.
-    param: key (str): The key associated with the lock to refresh.
-    param: lock_timeout_seconds (int): The new timeout in seconds after which the
-        lock will expire.
-    param: interval (int): The interval in seconds between refreshing the lock.
-    param: logger (logging.Logger): The logger to use for logging.
+    A lock returned by LDLM AsyncClient lock methods.
     """
 
-    def __init__(  # pylint: disable=too-many-arguments, too-many-positional-arguments
+    __slots__ = ("name", "key", "locked", "_client")
+
+    def __init__(self, client: AsyncClient, lock: pb.LockResponse):
+        """
+        Args:
+            client (Client): The client object.
+            lock (pb.LockResponse): An LDLM lock response object.
+        """
+        self._client: Optional[AsyncClient] = client if lock.locked else None
+
+        self.name: str = lock.name
+        """name of the lock"""
+
+        self.key: str = lock.key
+        """key associated with the lock"""
+
+        self.locked: bool = lock.locked
+        """whether the lock is locked or not"""
+
+    def __bool__(self) -> bool:
+        """
+        Returns whether the lock is locked or not.
+
+        Returns:
+            bool: Whether the lock is locked or not.
+        """
+        return self.locked
+
+    async def unlock(self) -> None:
+        """
+        Unlocks the lock.
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: If the lock is not locked
+        """
+        if not self.locked or self._client is None:
+            raise RuntimeError("unlock() called on unlocked lock")
+
+        await self._client.unlock(self.name, self.key)
+
+    async def renew(self, lock_timeout_seconds: int) -> None:
+        """
+        Renews the lock.
+
+        Args:
+            lock_timeout_seconds (int): The timeout in seconds after which the lock will
+                expire.
+
+        Returns:
+            None
+
+        Raises:
+            RuntimeError: If the lock is not locked
+        """
+        if not self.locked or self._client is None:
+            raise RuntimeError("renew() called on unlocked lock")
+        lock: AsyncLock = await self._client.renew(self.name, self.key,
+                                                   lock_timeout_seconds)
+        self.locked = lock.locked
+
+
+class _RenewTimer:
+    """
+    Timer implementation for renewing a lock
+    """
+
+    def __init__(
         self,
-        refresh_lock: Callable,
-        name: str,
-        key: str,
+        lock: AsyncLock,
         lock_timeout_seconds: int,
         interval: int,
         logger: logging.Logger,
     ):
+        """
+        Initializes a new instance of _RenewTimer.
+
+        Args:
+            lock (Lock): The lock to renew.
+            lock_timeout_seconds (int): The timeout in seconds after which the lock will
+                expire
+            interval (int): The interval in seconds between renew attempts
+            logger (logging.Logger): The logger to use for logging
+
+        Returns:
+            None
+        """
         self.interval: int = interval
-        self.fn: Callable = functools.partial(refresh_lock, name, key,
-                                              lock_timeout_seconds)
+        self.fn: Callable = functools.partial(lock.renew, lock_timeout_seconds)
         self.task: asyncio.Task | None = None
         logger.debug(
-            f"Refresh timer refreshing lock {name} every {self.interval} seconds."
+            f"Renew timer renewing lock {lock.name} every {self.interval} seconds."
         )
 
     async def start(self) -> None:
         """
-        Asynchronously starts the lock refresher.
-
-        Parameters:
-            None
+        Asynchronously starts the lock renewer.
 
         Returns:
             None
@@ -84,9 +150,6 @@ class RefreshLockTimer:
         function `self.fn()` is executed after each sleep interval using the `await` keyword to
         ensure asynchronous execution.
 
-        Parameters:
-            None
-
         Returns:
             None
         """
@@ -98,12 +161,6 @@ class RefreshLockTimer:
         """
         Cancels the task if it is not done.
 
-        This function checks if the task is not None and not done. If it is not done, it cancels
-        the task.
-
-        Parameters:
-            None
-
         Returns:
             None
         """
@@ -114,7 +171,7 @@ class RefreshLockTimer:
 
 class AsyncClient(BaseClient):
     """
-    asyncio client class for interacting with the ldlm gRPC server.
+    asyncio client class for interacting with the LDLM server.
     """
 
     def _create_channel(
@@ -126,15 +183,13 @@ class AsyncClient(BaseClient):
         Creates a gRPC channel to the specified address with optional credentials. Required by
         BaseClient ABC.
 
-        param: address (str): The address of the gRPC server.
-        param: creds (grpc.ChannelCredentials, optional): The credentials to use for the
-            channel. Defaults to None.
+        Args:
+            address (str): The address of the gRPC server.
+            creds (grpc.ChannelCredentials, optional): The credentials to use for the
+                channel. Defaults to None.
 
         Returns:
             grpc.Channel: The created gRPC channel.
-
-        Raises:
-            None
         """
         if creds is not None:
             return grpc.aio.secure_channel(
@@ -143,23 +198,26 @@ class AsyncClient(BaseClient):
             )
         return grpc.aio.insecure_channel(address)
 
-    async def rpc_with_retry(
+    async def _rpc_with_retry(
         self,
         rpc_func: str,
         rpc_message: Union[
-            pb2.LockRequest,
-            pb2.TryLockRequest,
-            pb2.RefreshLockRequest,
-            pb2.UnlockRequest,
+            pb.LockRequest,
+            pb.TryLockRequest,
+            pb.RenewRequest,
+            pb.UnlockRequest,
         ],
-    ) -> Union[pb2.LockResponse, pb2.UnlockResponse]:
+    ) -> Union[pb.LockResponse, pb.UnlockResponse]:
         """
         Executes an RPC call with retries in case of connection loss.
 
-        :param rpc_func: The RPC function to call.
-        :param rpc_message: The message to send in the RPC call.
+        Args:
+            rpc_func (str): The RPC function to call.
+            rpc_message (Union[LockRequest, TryLockRequest, RenewRequest, UnlockRequest]):
+                The message to send in the RPC call.
 
-        :return: The response from the RPC call.
+        Returns:
+            The response from the RPC call.
         """
         if self._password is not None:
             metadata = (("authorization", self._password),)
@@ -167,7 +225,7 @@ class AsyncClient(BaseClient):
             metadata = None
 
         num_retries = 0
-        rpc_func_callable = getattr(self.stub, rpc_func)
+        rpc_func_callable = getattr(self._stub, rpc_func)
         while True:
             try:
                 resp = await rpc_func_callable(rpc_message, metadata=metadata)
@@ -179,36 +237,10 @@ class AsyncClient(BaseClient):
                     raise
                 num_retries += 1
                 self._logger.warning(
-                    f"Encountered error {e} while trying rpc_call. "
+                    f"Encountered error {e} while attempting rpc_call. "
                     f"Retrying in {self._retry_delay_seconds} seconds "
                     f"({num_retries} of {self._retries}).")
                 await asyncio.sleep(self._retry_delay_seconds)
-
-    async def refresh_lock(
-            self, name: str, key: str,
-            lock_timeout_seconds: int) -> pb2.LockResponse:  # pylint: disable=E1101
-        """
-        Attempts to refresh a lock.
-
-        param: name (str): The name of the lock to refresh.
-        param: key (str): The key associated with the lock to refresh.
-        param: lock_timeout_seconds (int): The timeout in seconds for acquiring the lock.
-
-        Returns:
-                object: The response object returned by the gRPC server indicating the result of
-                    the lock attempt.
-        """
-        rpc_msg: pb2.RefreshLockRequest = (
-            pb2.RefreshLockRequest(  # pylint: disable=E1101
-                name=name,
-                key=key,
-                lock_timeout_seconds=lock_timeout_seconds,
-            ))
-
-        return await self.rpc_with_retry(
-            "RefreshLock",
-            rpc_msg,
-        )  # type: ignore
 
     async def lock(
         self,
@@ -216,61 +248,70 @@ class AsyncClient(BaseClient):
         wait_timeout_seconds: int = 0,
         lock_timeout_seconds: int = 0,
         size: int = 0,
-    ) -> pb2.LockResponse:
+    ) -> AsyncLock:
         """
-        Attempts to acquire a lock with the given name. If auto_refresh_lock is True, the lock will
-            be automatically refreshed at an appropriate interval using a RefreshLockTimer task.
+        Acquires a lock with the given name.
 
-        param: name (str): The name of the lock to acquire.
-        param: wait_timeout_seconds (int, optional): The timeout in seconds to wait for the lock to
-            be acquired. Defaults to 0.
-        param: lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock to
-            be acquired. Defaults to 0.
-        param: size (int, optional): The size of the lock. Defaults to 0 which translates to
-            unspecified. The server will use a size of 1 in this case.
+        If the client's `auto_renew_lock` parameter was set to True (the default) or left
+        unspecified, the lock will be automatically renewed at an appropriate interval using
+        a background asyncio task.
+
+        Args:
+            name (str): The name of the lock to acquire.
+            wait_timeout_seconds (int, optional): The timeout in seconds to wait for the
+                lock to be acquired. Defaults to 0.
+            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the
+                lock to be acquired. Defaults to 0.
+            size (int, optional): The size of the lock. Defaults to 0 which translates to
+                unspecified. The server will use a size of 1 in this case.
 
         Returns:
-            object: The response object returned by the gRPC server indicating the result of the
-                lock attempt.
+            AsyncLock: A lock object.
 
-        Raises:
-            RuntimeError: If the lock cannot be released after being acquired.
-
-        Example:
-            response = await client.lock(
-                    "my_lock",
-                    wait_timeout_seconds=10,
-                    lock_timeout_seconds=600,
-            )
-            if response.locked:
-                # Lock acquired, do something
-                await client.unlock("my_lock", response.key)
-            else:
-                # Lock not acquired, handle accordingly
+        Examples:
+            >>> import asyncio
+            >>> from ldlm import AsyncClient
+            >>> 
+            >>> async def test_lock():
+            ...     client = AsyncClient("ldlm-server:3144")
+            ...     lock = await client.lock(
+            ...             "test_lock",
+            ...             wait_timeout_seconds=10,
+            ...             lock_timeout_seconds=600,
+            ...     )   
+            ...     if not lock:
+            ...         print("Could not acquire lock within 10 seconds")
+            ...     print("Doing work with lock")
+            ...     await lock.unlock()
+            ...     print("Released lock")
+            ... 
+            >>> asyncio.run(test_lock())
+            Doing work with lock
+            Released lock
         """
-        rpc_msg: pb2.LockRequest = pb2.LockRequest(name=name)  # pylint: disable=E1101
+        rpc_msg: pb.LockRequest = pb.LockRequest(name=name)
         if wait_timeout_seconds:
             rpc_msg.wait_timeout_seconds = wait_timeout_seconds
         if self._lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
         elif lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = lock_timeout_seconds
-        if size > 0:  # pylint: disable=R1730
+        if size > 0:
             rpc_msg.size = size
 
         try:
             self._logger.info(f"Waiting to acquire lock `{name}`")
-            r: pb2.LockResponse = await self.rpc_with_retry("Lock", rpc_msg
-                                                           )  # type: ignore
+            r: pb.LockResponse = await self._rpc_with_retry("Lock", rpc_msg)
         except exceptions.LockWaitTimeoutError:
-            r = pb2.LockResponse(name=name, locked=False)  # pylint: disable=E1101
+            r = pb.LockResponse(name=name, locked=False)
 
         self._logger.info(f"Lock response from server: {r}")
 
-        if r.locked and rpc_msg.lock_timeout_seconds and self._auto_refresh_locks:
-            await self._start_refresh(name, r.key, rpc_msg.lock_timeout_seconds)
+        lock: AsyncLock = AsyncLock(self, r)
+        if lock.locked and rpc_msg.lock_timeout_seconds and self._auto_renew_locks:
+            await self._start_renew(lock, rpc_msg.lock_timeout_seconds)
 
-        return r
+        return lock
 
     @asynccontextmanager
     async def lock_context(
@@ -279,38 +320,47 @@ class AsyncClient(BaseClient):
         wait_timeout_seconds: int = 0,
         lock_timeout_seconds: int = 0,
         size: int = 0,
-    ) -> AsyncIterator[pb2.LockResponse]:
+    ) -> AsyncIterator[AsyncLock]:
         """
-        A context manager that attempts to acquire a lock with the given name. If auto_refresh_lock
-        is True, the lock will be automatically refreshed at an appropriate interval using a
-        RefreshLockTimer thread. Unlocks the lock and stops the RefreshLockTimer thread when the
-        context is exited.
+        A context manager that acquires a lock and unlocks it when the context is exited.
 
-        param: name (str): The name of the lock to acquire.
-        param: wait_timeout_seconds (int, optional): The timeout in seconds to wait for the lock to
-            be acquired. Defaults to 0.
-        param: lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock to
-            be acquired. Defaults to 0.
-        param: size (int, optional): The size of the lock. Defaults to 0 which translates to
-            unspecified. The server will use a size of 1 in this case.
+        If the client's `auto_renew_lock` parameter was set to True (the default) or left
+        unspecified, the lock will be automatically renewed at an appropriate interval using
+        a background asyncio task.
+
+        Args:
+            name (str): The name of the lock to acquire.
+            wait_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
+                to be acquired. Defaults to 0.
+            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
+                to be acquired. Defaults to 0.
+            size (int, optional): The size of the lock. Defaults to 0 which translates to
+                unspecified. The server will use a size of 1 in this case.
 
         Yields:
-            object: The response object returned by the gRPC server indicating the result of the
-                lock attempt.
+            AsyncLock: A lock object.
 
         Raises:
             RuntimeError: If the lock cannot be released after being acquired.
 
-        Example:
-            async with client.lock_context(
-                    "my_lock",
-                    wait_timeout_seconds=10,
-                    lock_timeout_seconds=600,
-            ) as response:
-                if response.locked:
-                    # Lock acquired, do something
-                else:
-                    # Lock not acquired, handle accordingly
+        Examples:
+            >>> import asyncio
+            >>> from ldlm import AsyncClient
+            >>> 
+            >>> async def test_lock_context():
+            ...     client = AsyncClient("ldlm-server:3144")
+            ...     
+            ...     async with client.lock_context(
+            ...             "my_lock",
+            ...             wait_timeout_seconds=10,
+            ...             lock_timeout_seconds=600,
+            ...     ) as lock:
+            ...         if not lock:
+            ...             print("Could not acquire lock within 10 seconds")
+            ...         print("Doing work with lock")
+            ... 
+            >>> asyncio.run(test_lock_context())
+            Doing work with lock
         """
 
         lock = await self.lock(
@@ -324,61 +374,75 @@ class AsyncClient(BaseClient):
             yield lock
         finally:
             if lock.locked:
-                await self.unlock(name, lock.key)
+                await lock.unlock()
 
     async def try_lock(
         self,
         name: str,
         lock_timeout_seconds: int = 0,
         size: int = 0,
-    ) -> pb2.LockResponse:
+    ) -> AsyncLock:
         """
-        Attempts to acquire a lock with the given name. If auto_refresh_lock is True, the lock
-        will be automatically refreshed after it is acquired by a RefreshLockTimer task.
+        Attempts to acquire a lock and immediately returns; whether the lock was acquired or not.
+        You must inspect the returned lock's `locked` property or evaluate it as a boolean
+        value to determine if it was acquired.
+        
+        If the client's `auto_renew_lock` parameter was set to True (the default) or left
+        unspecified, the lock will be automatically renewed at an appropriate interval using
+        a background asyncio task.
 
-        param: name (str): The name of the lock to acquire.
-        param: lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
-            to be acquired. Defaults to 0.
-        param: size (int, optional): The size of the lock. Defaults to 0 which translates to
-            unspecified. The server will use a size of 1 in this case.
+        Args:
+            name (str): The name of the lock to acquire.
+            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the
+                lock to be acquired. Defaults to 0.
+            size (int, optional): The size of the lock. Defaults to 0 which translates to
+                unspecified. The server will use a size of 1 in this case.
 
         Yields:
-            object: The response object returned by the gRPC server indicating the result of the
-                lock attempt.
+            AsyncLock: A lock object.
 
         Raises:
             RuntimeError: If the lock cannot be released after being acquired.
 
-        Example:
-            response = await client.try_lock("my_lock", 10)
-            if response.locked:
-                # Lock acquired, do something
-                await client.unlock("my_lock", response.key)
-            else:
-                # Lock not acquired, handle accordingly
+        Examples:
+            >>> async def test_try_lock():
+            ...     client = AsyncClient("ldlm-server:3144")
+            ...     
+            ...     lock = await client.try_lock(
+            ...             "my_lock",
+            ...             lock_timeout_seconds=600,
+            ...     ) 
+            ...     if not lock:
+            ...             print("Could not acquire lock")
+            ...     print("Doing work with lock")
+            ...     await lock.unlock()
+            ...     print("Released lock")
+            ... 
+            >>> asyncio.run(test_try_lock())
+            Doing work with lock
+            Released lock
         """
-        rpc_msg: pb2.TryLockRequest = pb2.TryLockRequest(  # pylint: disable=E1101
-            name=name,)
+        rpc_msg: pb.TryLockRequest = pb.TryLockRequest(name=name,)
         if self._lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
         elif lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = lock_timeout_seconds
-        if size > 0:  # pylint: disable=R1730
+        if size > 0:
             rpc_msg.size = size
 
         self._logger.info(f"Attempting to acquire lock `{name}`")
-        r: pb2.LockResponse = await self.rpc_with_retry("TryLock",
-                                                        rpc_msg)  # type: ignore
+        r: pb.LockResponse = await self._rpc_with_retry("TryLock", rpc_msg)
         self._logger.info(f"Lock response from server: {r}")
 
-        if r.locked and rpc_msg.lock_timeout_seconds and self._auto_refresh_locks:
-            await self._start_refresh(
-                name,
-                r.key,
+        lock: AsyncLock = AsyncLock(self, r)
+
+        if lock.locked and rpc_msg.lock_timeout_seconds and self._auto_renew_locks:
+            await self._start_renew(
+                lock,
                 rpc_msg.lock_timeout_seconds,
             )
 
-        return r
+        return lock
 
     @asynccontextmanager
     async def try_lock_context(
@@ -386,32 +450,43 @@ class AsyncClient(BaseClient):
         name: str,
         lock_timeout_seconds: int = 0,
         size: int = 0,
-    ) -> AsyncIterator[pb2.LockResponse]:
+    ) -> AsyncIterator[AsyncLock]:
         """
-        A context manager that attempts to acquire a lock with the given name. If auto_refresh_lock
-        is True, the lock will be automatically refreshed after it is acquired by a
-        RefreshLockTimer task. Unlocks the lock and stops the RefreshLockTimer task when the
-        context is exited.
+        A context manager that attempts to acquire a lock with the given name. You must inspect the
+        returned lock's `locked` property or evaluate it as a boolean value to determine if it was
+        acquired. If locked, the lock will be released when the context is exited.
+        
+        If the client's `auto_renew_lock` parameter was set to True (the default) or left
+        unspecified, the lock will be automatically renewed at an appropriate interval using
+        a background asyncio task.
 
-        param: name (str): The name of the lock to acquire.
-        param: lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock to
-            be acquired. Defaults to 0.
-        param: size (int, optional): The size of the lock. Defaults to 0 which translates to
-            unspecified. The server will use a size of 1 in this case.
+        Args:
+            name (str): The name of the lock to acquire.
+            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
+                to be acquired. Defaults to 0.
+            size (int, optional): The size of the lock. Defaults to 0 which translates to
+                unspecified. The server will use a size of 1 in this case.
 
         Yields:
-            object: The response object returned by the gRPC server indicating the result of the
-                lock attempt.
+            AsyncLock: A lock object.
 
         Raises:
             RuntimeError: If the lock cannot be released after being acquired.
 
-        Example:
-            async with try_lock_context(stub, "my_lock", 10) as response:
-                if response.locked:
-                    # Lock acquired, do something
-                else:
-                    # Lock not acquired, handle accordingly
+        Examples:
+            >>> async def test_try_lock_context():
+            ...     client = AsyncClient("ldlm-server:3144")
+            ...     
+            ...     async with client.try_lock_context(
+            ...             "my_lock",
+            ...             lock_timeout_seconds=600,
+            ...     ) as lock:
+            ...         if not lock:
+            ...             print("Could not acquire lock")
+            ...         print("Doing work with lock")
+            ... 
+            >>> asyncio.run(test_try_lock_context())
+            Doing work with lock
         """
         lock = await self.try_lock(
             name,
@@ -423,70 +498,101 @@ class AsyncClient(BaseClient):
             yield lock
         finally:
             if lock.locked:
-                await self.unlock(name, lock.key)
+                await lock.unlock()
 
     async def unlock(self, name: str, key: str) -> None:
         """
-        Attempts to unlock a lock.
+        Unlock the specified lock. It is much more concise to run this method on the
+        :py:class:`ldlm.AsyncLock` object returned by this client's lock methods.
 
-        param: name (str): The name of the lock to unlock.
-        param: key (str): The key associated with the lock to unlock.
+        Args:
+            name (str): The name of the lock to unlock.
+            key (str): The key associated with the lock to unlock.
 
         Raises:
-                RuntimeError: If the lock cannot be unlocked.
+            RuntimeError: If the lock cannot be unlocked.
         """
         if timer := self._lock_timers.pop(name, None):
-            self._logger.debug(f"Canceling lock refresh for `{name}`")
+            self._logger.debug(f"Canceling lock renew for `{name}`")
             timer.cancel()
 
-        rpc_msg: pb2.UnlockRequest = pb2.UnlockRequest(  # pylint: disable=E1101
+        rpc_msg: pb.UnlockRequest = pb.UnlockRequest(
             name=name,
             key=key,
         )
 
         self._logger.debug(f"Unlocking `{name}`")
-        r: pb2.UnlockResponse = await self.rpc_with_retry("Unlock", rpc_msg
-                                                         )  # type: ignore
+        r: pb.UnlockResponse = await self._rpc_with_retry("Unlock", rpc_msg)
         self._logger.debug(f"Unlock response from server: {r}")
         if not r.unlocked:  # pragma: no cover
             raise RuntimeError(f"Failed to unlock `{name}`")
 
-    async def _start_refresh(self, name: str, key: str,
-                             lock_timeout_seconds: int) -> None:
+    async def renew(self, name: str, key: str,
+                    lock_timeout_seconds: int) -> AsyncLock:
         """
-        Start the refresh timer for a lock.
+        Renews a lock. It is much more concise to run this method on the :py:class:`ldlm.AsyncLock`
+        object returned by this client's lock methods.
 
-        param: name (str): The name of the lock to refresh.
-        param: key (str): The key associated with the lock to refresh.
-        param: lock_timeout_seconds (int): The timeout in seconds after which the lock will expire
+        Args:
+            name (str): The name of the lock to renew.
+            key (str): The key associated with the lock to renew.
+            lock_timeout_seconds (int): The timeout in seconds for acquiring the lock.
+
+        Returns:
+            AsyncLock: A lock object.
+        """
+        rpc_msg: pb.RenewRequest = (pb.RenewRequest(
+            name=name,
+            key=key,
+            lock_timeout_seconds=lock_timeout_seconds,
+        ))
+
+        resp: pb.LockResponse = await self._rpc_with_retry(
+            "Renew",
+            rpc_msg,
+        )
+        return AsyncLock(self, resp)
+
+    async def _start_renew(self, lock: AsyncLock,
+                           lock_timeout_seconds: int) -> None:
+        """
+        Start the renew timer for a lock.
+
+        Args:
+            name (str): The name of the lock to renew.
+            key (str): The key associated with the lock to renew.
+            lock_timeout_seconds (int): The timeout in seconds after which the lock will
+                expire
 
         Raises:
-            RuntimeError: If a refresh timer already exists for the lock.
+            RuntimeError: If a renew timer already exists for the lock.
 
         Returns:
             None
         """
-        if name in self._lock_timers:  # pragma: no cover
-            raise RuntimeError(f"Lock `{name}` already has a refresh timer")
+        if lock.name in self._lock_timers:  # pragma: no cover
+            raise RuntimeError(f"Lock `{lock.name}` already has a renew timer")
 
         interval = max(lock_timeout_seconds - 30,
-                       self.min_refresh_interval_seconds)
-        self._lock_timers[name] = RefreshLockTimer(
-            self.refresh_lock,
-            name,
-            key,
+                       self.min_renew_interval_seconds)
+        self._lock_timers[lock.name] = _RenewTimer(
+            lock,
             lock_timeout_seconds,
             interval=interval,
             logger=self._logger,
         )
-        await self._lock_timers[name].start()
+        await self._lock_timers[lock.name].start()
 
     async def close(self) -> None:
         """
-        Closes the channel and sets the `_closed` attribute to `True`.
+        Closes the LDLM gRPC channel.
 
-        This method is used to close the channel and indicate that the client is no longer active.
-        It is typically called when the client is no longer needed or when the program is exiting.
+        This method is used to close the LDLM gRPC channel and indicate that the client is no
+        longer active. It is typically called when the client is no longer needed or when the
+        program is exiting.
+
+        Returns:
+            None
         """
         await self._channel.close()
         self._closed = True
@@ -494,5 +600,8 @@ class AsyncClient(BaseClient):
     async def aclose(self) -> None:
         """
         Awaits self.close(). For compatibility with contextlib.aclosing().
+
+        Returns:
+            None
         """
         await self.close()
