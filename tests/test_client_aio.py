@@ -108,7 +108,7 @@ class MockedAsyncClient(AsyncClient):
 
 @pytest.fixture
 def client():
-    return MockedAsyncClient(address="localhost:3144")
+    return MockedAsyncClient(address="ldlm-server:3144")
 
 
 @pytest.mark.asyncio
@@ -285,7 +285,7 @@ class TestLock:
         Test the lock method of the client with a client instance lock timeout.
         """
         client = MockedAsyncClient(
-            address="localhost:3144",
+            address="ldlm-server:3144",
             lock_timeout_seconds=10,
             auto_renew_locks=False,
         )
@@ -309,7 +309,7 @@ class TestLock:
         Test the lock method of the client with a wait timeout set.
         """
         client = MockedAsyncClient(
-            address="localhost:3144",
+            address="ldlm-server:3144",
             auto_renew_locks=False,
         )
         client.lock_response = pb2.LockResponse(
@@ -462,7 +462,7 @@ class TestTryLock:
         Test the lock method of the client with a client instance timeout.
         """
         client = MockedAsyncClient(
-            address="localhost:3144",
+            address="ldlm-server:3144",
             lock_timeout_seconds=10,
             auto_renew_locks=False,
         )
@@ -657,7 +657,7 @@ class TestRpcWithRetry:
         asserts that the `TryLock` method of the `c._stub` object was called with the correct
         arguments, including the authorization metadata containing the password.
         """
-        c = MockedAsyncClient("localhost:3144", password="asdf1234")
+        c = MockedAsyncClient("ldlm-server:3144", password="asdf1234")
         await c.try_lock("mylock")
         assert c._stub.TryLock.mock_calls == [
             mock.call(
@@ -695,20 +695,20 @@ class TestCreateChannel:
     def test_with_ssl_config(self, mock_secure_chan, mock_insecure_chan,
                              mock_creds):
         tls = TLSConfig()
-        c = MockedAsyncClient("localhost:3144", tls=tls)
+        c = MockedAsyncClient("ldlm-server:3144", tls=tls)
 
         assert mock_secure_chan.mock_calls == [
-            mock.call("localhost:3144", mock_creds.return_value),
+            mock.call("ldlm-server:3144", mock_creds.return_value),
         ]
         assert mock_insecure_chan.mock_calls == []
 
     def test_no_ssl_config(self, mock_secure_chan, mock_insecure_chan,
                            mock_creds):
-        c = MockedAsyncClient("localhost:3144", tls=None)
+        c = MockedAsyncClient("ldlm-server:3144", tls=None)
 
         assert mock_secure_chan.mock_calls == []
         assert mock_insecure_chan.mock_calls == [
-            mock.call("localhost:3144"),
+            mock.call("ldlm-server:3144"),
         ]
 
 
@@ -723,7 +723,7 @@ class TestClosing:
     async def test_closing(self, client):
         # This shouldn't raise an exception
         async with contextlib.aclosing(
-                AsyncClient(address="localhost:3144")) as client:
+                AsyncClient(address="ldlm-server:3144")) as client:
             pass
 
 

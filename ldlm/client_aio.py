@@ -273,7 +273,7 @@ class AsyncClient(BaseClient):
             >>> from ldlm import AsyncClient
             >>> 
             >>> async def test_lock():
-            ...     client = AsyncClient("localhost:3144")
+            ...     client = AsyncClient("ldlm-server:3144")
             ...     lock = await client.lock(
             ...             "test_lock",
             ...             wait_timeout_seconds=10,
@@ -348,7 +348,7 @@ class AsyncClient(BaseClient):
             >>> from ldlm import AsyncClient
             >>> 
             >>> async def test_lock_context():
-            ...     client = AsyncClient("localhost:3144")
+            ...     client = AsyncClient("ldlm-server:3144")
             ...     
             ...     async with client.lock_context(
             ...             "my_lock",
@@ -406,7 +406,7 @@ class AsyncClient(BaseClient):
 
         Examples:
             >>> async def test_try_lock():
-            ...     client = AsyncClient("localhost:3144")
+            ...     client = AsyncClient("ldlm-server:3144")
             ...     
             ...     lock = await client.try_lock(
             ...             "my_lock",
@@ -475,7 +475,7 @@ class AsyncClient(BaseClient):
 
         Examples:
             >>> async def test_try_lock_context():
-            ...     client = AsyncClient("localhost:3144")
+            ...     client = AsyncClient("ldlm-server:3144")
             ...     
             ...     async with client.try_lock_context(
             ...             "my_lock",

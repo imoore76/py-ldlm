@@ -16,7 +16,7 @@ A lock is uniquely identified by its name. This is specified when the lock is re
 
     import ldlm
 
-    client = ldlm.Client("localhost:3144")
+    client = ldlm.Client("ldlm-server:3144")
 
     lock = client.lock("my-task")
 
@@ -33,7 +33,7 @@ number of lock acquisitions to be held on the same lock.
     # Number of expensive operation slots
     ES_SLOTS = 20
 
-    client = ldlm.Client("localhost:3144")
+    client = ldlm.Client("ldlm-server:3144")
 
     lock = client.lock("expensive_operation", size=ES_SLOTS)
 
@@ -54,7 +54,7 @@ it is released. See also `Renewing a lock`_.
 
     import ldlm
 
-    client = ldlm.Client("localhost:3144")
+    client = ldlm.Client("ldlm-server:3144")
 
     lock = client.lock("my-task", lock_timeout_seconds=300)
 
@@ -135,7 +135,7 @@ The ``unlock()`` method is used to release a held lock.
 
     import ldlm
 
-    client = ldlm.Client("localhost:3144")
+    client = ldlm.Client("ldlm-server:3144")
 
     lock = client.lock("my-task")
 
@@ -166,7 +166,7 @@ which will be used as new the lock timeout from the time of renewal.
 
     import ldlm
 
-    client = ldlm.Client("localhost:3144")
+    client = ldlm.Client("ldlm-server:3144")
 
     lock = client.lock("my-task", lock_timeout_seconds=300)
 

@@ -206,7 +206,7 @@ class Client(BaseClient):
         Examples:
             >>> from ldlm import Client
             >>> 
-            >>> client = Client("localhost:3144")
+            >>> client = Client("ldlm-server:3144")
             >>>     
             >>> lock = client.lock(
             ...     "my_lock",
@@ -296,7 +296,7 @@ class Client(BaseClient):
         Examples:
             >>> from ldlm import Client
             >>> 
-            >>> client = Client("localhost:3144")
+            >>> client = Client("ldlm-server:3144")
             >>> 
             >>> with client.lock_context(
             ...     "my_lock",
@@ -359,7 +359,7 @@ class Client(BaseClient):
         Examples:
             >>> from ldlm import Client
             >>> 
-            >>> client = Client("localhost:3144")
+            >>> client = Client("ldlm-server:3144")
             >>>     
             >>> lock = client.try_lock(
             ...     "my_lock",
@@ -429,7 +429,7 @@ class Client(BaseClient):
         Examples:
             >>> from ldlm import Client
             >>> 
-            >>> client = Client("localhost:3144")
+            >>> client = Client("ldlm-server:3144")
             >>> 
             >>> with client.try_lock_context(
             ...     "my_lock",

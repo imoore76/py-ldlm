@@ -62,11 +62,11 @@ class TestTLSConfig:
         Test that when no tls config is provided, the _create_channel method is called with the
         correct arguments (address, None).
         """
-        c = MockedClient("localhost:3144")
+        c = MockedClient("ldlm-server:3144")
 
         assert mock_creds.mock_calls == []
         assert c._create_channel.mock_calls == [
-            mock.call("localhost:3144", None),
+            mock.call("ldlm-server:3144", None),
         ]
 
     def test_empty_ssl_config(self, mock_creds):
@@ -76,7 +76,7 @@ class TestTLSConfig:
         _create_channel method.
         """
         tls = TLSConfig()
-        c = MockedClient("localhost:3144", tls=tls)
+        c = MockedClient("ldlm-server:3144", tls=tls)
 
         assert mock_creds.mock_calls == [
             mock.call(
@@ -87,7 +87,7 @@ class TestTLSConfig:
         ]
         print(c._create_channel.mock_calls)
         assert c._create_channel.mock_calls == [
-            mock.call("localhost:3144", mock_creds.return_value),
+            mock.call("ldlm-server:3144", mock_creds.return_value),
         ]
 
     def test_all_certs(self, mock_creds):
@@ -100,7 +100,7 @@ class TestTLSConfig:
             cert_file="tests/certs/client_cert.pem",
             key_file="tests/certs/client_key.pem",
         )
-        c = MockedClient("localhost:3144", tls=tls)
+        c = MockedClient("ldlm-server:3144", tls=tls)
 
         assert mock_creds.mock_calls == [
             mock.call(
@@ -110,5 +110,5 @@ class TestTLSConfig:
             )
         ]
         assert c._create_channel.mock_calls == [
-            mock.call("localhost:3144", mock_creds.return_value),
+            mock.call("ldlm-server:3144", mock_creds.return_value),
         ]
