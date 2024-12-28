@@ -23,8 +23,6 @@ Contents
     :maxdepth: 2
 
     overview
-    concepts
-    uses
     ldlm
     CONTRIBUTING
     LICENSE
