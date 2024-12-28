@@ -14,6 +14,7 @@ author = 'Ian Moore'
 release = get_version(root=os.path.abspath('../'))
 
 extensions = [
+#	'm2r2',
     'myst_parser',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
