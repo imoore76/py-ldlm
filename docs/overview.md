@@ -11,7 +11,7 @@
 <img src="./_static/logo_symbol.png" width=100 alt="LDLM logo"/>
 </p>
 
-An <a href="http://github.com/imoore76/go-ldlm" target="_blank">LDLM</a> client library providing Python sync and async clients.
+An <a href="http://github.com/imoore76/ldlm" target="_blank">LDLM</a> client library providing Python sync and async clients.
 
 ## Installation
 
