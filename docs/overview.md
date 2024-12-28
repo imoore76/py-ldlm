@@ -18,3 +18,22 @@ An <a href="http://github.com/imoore76/ldlm" target="_blank">LDLM</a> client lib
 ```
 pip install py-ldlm
 ```
+
+## Basic Usage
+
+```python
+
+import ldlm
+
+client = ldlm.Client("ldlm-server:3144")
+
+lock = client.lock("my-task")
+
+do_something()
+
+lock.unlock()
+
+```
+
+More advanced usage and examples can be found in the <a href='ldlm.html'>API Reference section</a>.
+
