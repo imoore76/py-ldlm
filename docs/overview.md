@@ -11,10 +11,29 @@
 <img src="./_static/logo_symbol.png" width=100 alt="LDLM logo"/>
 </p>
 
-An <a href="http://github.com/imoore76/ldlm" target="_blank">LDLM</a> client library providing Python sync and async clients.
+An <a href="http://github.com/imoore76/ldlm" target="_blank">LDLM</a> client library providing Python sync and async clients. For LDLM concepts, use cases, and general information, see the <a href="https://ldlm.readthedocs.io/" target="_blank">LDLM documentation</a>.
 
 ## Installation
 
 ```
 pip install py-ldlm
 ```
+
+## Basic Usage
+
+```python
+
+import ldlm
+
+client = ldlm.Client("ldlm-server:3144")
+
+lock = client.lock("my-task")
+
+do_something()
+
+lock.unlock()
+
+```
+
+More advanced usage and examples can be found in the <a href='ldlm.html'>API Reference section</a>.
+
