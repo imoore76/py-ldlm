@@ -24,8 +24,8 @@ Contents
 
     overview
     ldlm
-    CONTRIBUTING
-    LICENSE
+    contributing
+    license
 
 
 Disclaimer
