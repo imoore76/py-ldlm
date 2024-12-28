@@ -1,6 +1,6 @@
 # py-ldlm
 
-An LDLM (http://github.com/imoore76/go-ldlm) client library providing Python sync and async clients.
+An LDLM (http://github.com/imoore76/ldlm) client library providing Python sync and async clients.
 
 [![PyPI version](https://badge.fury.io/py/py-ldlm.svg)](https://badge.fury.io/py/py-ldlm)
 [![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2Fimoore76%2Fpy-ldlm%2Fmain%2Fpyproject.toml)](https://github.com/imoore76/py-ldlm/blob/main/pyproject.toml)

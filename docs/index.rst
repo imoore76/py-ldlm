@@ -4,7 +4,7 @@ py-ldlm
 
 .. |ldlm_link| raw:: html
 
-   <a href="http://github.com/imoore76/go-ldlm" target="_blank">LDLM</a>
+   <a href="http://github.com/imoore76/ldlm" target="_blank">LDLM</a>
 
 .. image:: _static/logo.png
     :align: center
