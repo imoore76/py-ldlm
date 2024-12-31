@@ -217,8 +217,11 @@ class Client(BaseClient):
             ...     print("Could not acquire lock within 10 seconds")
             ... else:
             ...     print("Doing work with lock")
-            ...     lock.unlock()
-            ...     print("Released lock")
+            ...     try:
+            ...         pass // do work
+            ...     finally:
+            ...         lock.unlock()
+            ...         print("Released lock")
             ... 
             Doing work with lock
             Released lock
@@ -231,9 +234,12 @@ class Client(BaseClient):
             >>> print("Lock obtained")
             Lock obtained
             >>> # Do work with lock
-            >>> lock.unlock()
-            >>> print("Released lock")
-            Released lock
+            >>> try:
+            ...     pass // do work
+            ... finally:
+            ...     lock.unlock()
+            ...     print("Released lock")
+            >>> Released lock
         """
         rpc_msg: pb.LockRequest = pb.LockRequest(name=name)
         if wait_timeout_seconds:
@@ -369,8 +375,11 @@ class Client(BaseClient):
             ...     print("Could not acquire lock")
             ... else:
             ...     print("Doing work with lock")
-            ...     lock.unlock()
-            ...     print("Released lock")
+            ...     try:
+            ...         pass // do work
+            ...     finally:
+            ...         lock.unlock()
+            ...         print("Released lock")
             ... 
             Doing work with lock
             Released lock

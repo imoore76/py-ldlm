@@ -281,9 +281,13 @@ class AsyncClient(BaseClient):
             ...     )   
             ...     if not lock:
             ...         print("Could not acquire lock within 10 seconds")
+            ...         return
             ...     print("Doing work with lock")
-            ...     await lock.unlock()
-            ...     print("Released lock")
+            ...     try:
+            ...         pass # do some work with the lock
+            ...     finally:
+            ...         await lock.unlock()
+            ...         print("Released lock")
             ... 
             >>> asyncio.run(test_lock())
             Doing work with lock
@@ -413,10 +417,14 @@ class AsyncClient(BaseClient):
             ...             lock_timeout_seconds=600,
             ...     ) 
             ...     if not lock:
-            ...             print("Could not acquire lock")
+            ...         print("Could not acquire lock")
+            ...         return
             ...     print("Doing work with lock")
-            ...     await lock.unlock()
-            ...     print("Released lock")
+            ...     try:
+            ...         pass # do some work with the lock
+            ...     finally:
+            ...         await lock.unlock()
+            ...         print("Released lock")
             ... 
             >>> asyncio.run(test_try_lock())
             Doing work with lock
