@@ -14,7 +14,6 @@ author = 'Ian Moore'
 release = get_version(root=os.path.abspath('../'))
 
 extensions = [
-#	'm2r2',
     'myst_parser',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
@@ -36,4 +35,3 @@ html_static_path = ['_static']
 html_theme_options = {}
 html_favicon = 'favicon.ico'
 
-#html_sidebars = { '**': ['globaltoc.html', 'relations.html', 'sourcelink.html', 'searchbox.html'], }
