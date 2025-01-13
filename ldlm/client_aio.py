@@ -246,7 +246,7 @@ class AsyncClient(BaseClient):
         self,
         name: str,
         wait_timeout_seconds: int = 0,
-        lock_timeout_seconds: int = 0,
+        lock_timeout_seconds: Optional[int] = None,
         size: int = 0,
     ) -> AsyncLock:
         """
@@ -259,9 +259,9 @@ class AsyncClient(BaseClient):
         Args:
             name (str): The name of the lock to acquire.
             wait_timeout_seconds (int, optional): The timeout in seconds to wait for the
-                lock to be acquired. Defaults to 0.
-            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the
-                lock to be acquired. Defaults to 0.
+                lock to be acquired. Defaults to 0 (wait indefinitely).
+            lock_timeout_seconds (int, optional): The timeout in seconds after which the
+                lock will be released unless it is renewed. Defaults to None (no timeout).
             size (int, optional): The size of the lock. Defaults to 0 which translates to
                 unspecified. The server will use a size of 1 in this case.
 
@@ -296,10 +296,10 @@ class AsyncClient(BaseClient):
         rpc_msg: pb.LockRequest = pb.LockRequest(name=name)
         if wait_timeout_seconds:
             rpc_msg.wait_timeout_seconds = wait_timeout_seconds
-        if self._lock_timeout_seconds:
-            rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
-        elif lock_timeout_seconds:
+        if lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = lock_timeout_seconds
+        elif lock_timeout_seconds is None and self._lock_timeout_seconds:
+            rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
         if size > 0:
             rpc_msg.size = size
 
@@ -322,7 +322,7 @@ class AsyncClient(BaseClient):
         self,
         name: str,
         wait_timeout_seconds: int = 0,
-        lock_timeout_seconds: int = 0,
+        lock_timeout_seconds: Optional[int] = None,
         size: int = 0,
     ) -> AsyncIterator[AsyncLock]:
         """
@@ -334,10 +334,10 @@ class AsyncClient(BaseClient):
 
         Args:
             name (str): The name of the lock to acquire.
-            wait_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
-                to be acquired. Defaults to 0.
-            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
-                to be acquired. Defaults to 0.
+            wait_timeout_seconds (int, optional): The timeout in seconds to wait for the
+                lock to be acquired. Defaults to 0 (wait indefinitely).
+            lock_timeout_seconds (int, optional): The timeout in seconds after which the
+                lock will be released unless it is renewed. Defaults to 0 (no timeout).
             size (int, optional): The size of the lock. Defaults to 0 which translates to
                 unspecified. The server will use a size of 1 in this case.
 
@@ -383,7 +383,7 @@ class AsyncClient(BaseClient):
     async def try_lock(
         self,
         name: str,
-        lock_timeout_seconds: int = 0,
+        lock_timeout_seconds: Optional[int] = None,
         size: int = 0,
     ) -> AsyncLock:
         """
@@ -397,8 +397,8 @@ class AsyncClient(BaseClient):
 
         Args:
             name (str): The name of the lock to acquire.
-            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the
-                lock to be acquired. Defaults to 0.
+            lock_timeout_seconds (int, optional): The timeout in seconds after which the
+                lock will be released unless it is renewed. Defaults to None (no timeout).
             size (int, optional): The size of the lock. Defaults to 0 which translates to
                 unspecified. The server will use a size of 1 in this case.
 
@@ -431,10 +431,10 @@ class AsyncClient(BaseClient):
             Released lock
         """
         rpc_msg: pb.TryLockRequest = pb.TryLockRequest(name=name,)
-        if self._lock_timeout_seconds:
-            rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
-        elif lock_timeout_seconds:
+        if lock_timeout_seconds:
             rpc_msg.lock_timeout_seconds = lock_timeout_seconds
+        elif lock_timeout_seconds is None and self._lock_timeout_seconds:
+            rpc_msg.lock_timeout_seconds = self._lock_timeout_seconds
         if size > 0:
             rpc_msg.size = size
 
@@ -456,7 +456,7 @@ class AsyncClient(BaseClient):
     async def try_lock_context(
         self,
         name: str,
-        lock_timeout_seconds: int = 0,
+        lock_timeout_seconds: Optional[int] = None,
         size: int = 0,
     ) -> AsyncIterator[AsyncLock]:
         """
@@ -470,8 +470,8 @@ class AsyncClient(BaseClient):
 
         Args:
             name (str): The name of the lock to acquire.
-            lock_timeout_seconds (int, optional): The timeout in seconds to wait for the lock
-                to be acquired. Defaults to 0.
+            lock_timeout_seconds (int, optional): The timeout in seconds after which the
+                lock will be released unless it is renewed. Defaults to None (no timeout).
             size (int, optional): The size of the lock. Defaults to 0 which translates to
                 unspecified. The server will use a size of 1 in this case.
 
@@ -602,8 +602,9 @@ class AsyncClient(BaseClient):
         Returns:
             None
         """
-        await self._channel.close()
-        self._closed = True
+        if self._channel:
+            await self._channel.close()
+            self._closed = True
 
     async def aclose(self) -> None:
         """

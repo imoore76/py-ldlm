@@ -233,7 +233,7 @@ class TestLock:
             mock.call(
                 name,
                 wait_timeout_seconds=kwargs.get("wait_timeout_seconds", 0),
-                lock_timeout_seconds=kwargs.get("lock_timeout_seconds", 0),
+                lock_timeout_seconds=kwargs.get("lock_timeout_seconds"),
                 size=kwargs.get("size", 0),
             )
         ]
@@ -400,7 +400,7 @@ class TestTryLock:
         assert lock_mock.mock_calls == [
             mock.call(
                 name,
-                lock_timeout_seconds=kwargs.get("lock_timeout_seconds", 0),
+                lock_timeout_seconds=kwargs.get("lock_timeout_seconds"),
                 size=kwargs.get("size", 0),
             )
         ]

@@ -92,12 +92,53 @@ Basic Usage
         do_something()
 
 
-More advanced usage and examples can be found in 
-
 .. |useslink| raw:: html
 
     <a href="https://ldlm.readthedocs.io/en/stable/uses.html" target="_blank">LDLM Use Cases</a>
 
-* The |useslink| documentation
-* The :doc:`API Reference</ldlm>` section
+.. |conceptslink| raw:: html
 
+    <a href="https://ldlm.readthedocs.io/en/stable/concepts.html" target="_blank">LDLM Concepts</a>
+
+.. seealso::
+
+    More advanced usage and examples can be found in 
+
+    * The |conceptslink| documentation
+    * The |useslink| documentation
+    * The :doc:`API Reference</ldlm>` section
+
+
+TLS Configuration
+==========================
+
+.. |ldlmtls| raw:: html
+
+    <a href="https://ldlm.readthedocs.io/en/stable/configuration.html#configuration-recipes" target="_blank">Configuration Recipes</a>
+
+Using TLS for LDLM client connections involves passing an ``ldlm.TLSConfig`` object to 
+the client on instantiation.
+
+.. code-block:: python
+    :caption: Server TLS with signed by private CA
+
+    import ldlm
+
+    client = ldlm.Client("ldlm-server:3144", tls=ldlm.TLSConfig(
+        ca_file="/etc/ldlm/certs/ca_cert.pem"
+    ))
+
+.. code-block:: python
+    :caption: Mutual TLS
+
+    import ldlm
+
+    client = ldlm.Client("ldlm-server:3144", tls=ldlm.TLSConfig(
+        cert_file="/etc/ldlm/certs/client_cert.pem",
+        key_file="/etc/ldlm/certs/client_cert.pem",
+        ca_file="/etc/ldlm/certs/ca_cert.pem"
+    ))
+
+.. seealso::
+
+    Be sure to set up TLS in the server as described in |ldlmtls|.
