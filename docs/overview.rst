@@ -109,18 +109,18 @@ Basic Usage
     * The :doc:`API Reference</ldlm>` section
 
 
-TLS Configuration
+TLS
 ==========================
 
 .. |ldlmtls| raw:: html
 
     <a href="https://ldlm.readthedocs.io/en/stable/configuration.html#configuration-recipes" target="_blank">Configuration Recipes</a>
 
-Using TLS for LDLM client connections involves passing an ``ldlm.TLSConfig`` object to 
+Using TLS for LDLM client connections involves passing an :ref:`ldlm.TLSConfig<ldlm:TLS Configuration>` object to 
 the client on instantiation.
 
 .. code-block:: python
-    :caption: Server TLS with signed by private CA
+    :caption: Server TLS with cert signed by private CA
 
     import ldlm
 

@@ -15,6 +15,7 @@ release = get_version(root=os.path.abspath('../'))
 
 extensions = [
     'myst_parser',
+    'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
@@ -26,6 +27,7 @@ autodoc_default_options = {
 }
 
 autoclass_content = "both"
+autosectionlabel_prefix_document = True
 
 templates_path = []
 exclude_patterns = []
