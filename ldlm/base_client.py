@@ -67,6 +67,9 @@ class BaseClient(abc.ABC):  # pylint: disable=too-few-public-methods,too-many-in
     Base client class for interacting with the LDLM gRPC server.
     """
 
+    _channel: Optional[grpc.Channel] = None
+    """LDLM gRPC channel"""
+
     min_renew_interval_seconds: int = 10
     """minimum time between lock renews in seconds"""
 
@@ -102,7 +105,8 @@ class BaseClient(abc.ABC):  # pylint: disable=too-few-public-methods,too-many-in
         else:
             creds = None
 
-        self._channel: grpc.Channel = self._create_channel(address, creds)
+        self._channel: Optional[grpc.Channel] = self._create_channel(
+            address, creds)
 
         # Number of times to retry each request in case of failure
         self._retries: int = retries
