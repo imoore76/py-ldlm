@@ -4,17 +4,17 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 import os
 import sys
-from setuptools_scm import get_version
 
 sys.path.insert(0, os.path.abspath('../ldlm'))
 
 project = 'py-ldlm'
 copyright = '2024, Google LLC'
 author = 'Ian Moore'
-release = get_version(root=os.path.abspath('../'))
+release = os.getenv("READTHEDOCS_VERSION_NAME", "latest")
 
 extensions = [
     'myst_parser',
+    'sphinx_copybutton',
     'sphinx.ext.autosectionlabel',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
