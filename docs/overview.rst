@@ -94,11 +94,11 @@ Basic Usage
 
 .. |useslink| raw:: html
 
-    <a href="https://ldlm.readthedocs.io/en/stable/uses.html" target="_blank">LDLM Use Cases</a>
+    <a href="https://ldlm.readthedocs.io/stable/uses.html" target="_blank">LDLM Use Cases</a>
 
 .. |conceptslink| raw:: html
 
-    <a href="https://ldlm.readthedocs.io/en/stable/concepts.html" target="_blank">LDLM Concepts</a>
+    <a href="https://ldlm.readthedocs.io/stable/concepts.html" target="_blank">LDLM Concepts</a>
 
 .. seealso::
 
@@ -114,7 +114,7 @@ TLS
 
 .. |ldlmtls| raw:: html
 
-    <a href="https://ldlm.readthedocs.io/en/stable/configuration.html#configuration-recipes" target="_blank">Configuration Recipes</a>
+    <a href="https://ldlm.readthedocs.io/stable/configuration.html#configuration-recipes" target="_blank">Configuration Recipes</a>
 
 Using TLS for LDLM client connections involves passing an :ref:`ldlm.TLSConfig<ldlm:TLS Configuration>` object to 
 the client on instantiation.
