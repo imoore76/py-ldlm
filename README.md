@@ -17,7 +17,7 @@ pip install py-ldlm
 
 ## Usage
 
-See full ducumentation at https://py-ldlm.readthedocs.io/
+See full documentation at https://py-ldlm-docs.readthedocs.io/
 
 ## License
 
