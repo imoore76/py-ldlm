@@ -15,7 +15,6 @@
 # Requires
 # - grep
 # - pcre2grep
-# - misspell
 # - which
 # - curl
 # - addlicense (github.com/google/addlicense)
@@ -59,19 +58,6 @@ tasks:
       - 2to3 -w -n ldlm/protos/*py
       - addlicense ldlm/protos/*
 
-  docs:
-    desc: "Build documentation"
-    sources:
-      - '**/*.py'
-      - '*py'
-    dir: docs
-    cmds:
-      # API docs generated with
-      # sphinx-apidoc -e -f -o ./ ../ldlm ../ldlm/protos/ ../ldlm/*client*.py
-      # then edited
-      - make clean
-      - make html
-
   test:
     desc: "Run unit tests"
     aliases: ["t"]
@@ -110,7 +96,6 @@ tasks:
       - task: googlify
       - task: fmt
       - task: lint
-      - misspell ./...
       - task: test
       - task: clean
       - find . -type f -not -name "*.sh" -not -path "./.venv/*" -exec chmod a-x {} \;

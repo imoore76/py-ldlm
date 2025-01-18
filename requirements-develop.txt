@@ -1,4 +1,4 @@
--e .[test,docs]
+-e .[test]
 
 grpcio-tools
 pylint
